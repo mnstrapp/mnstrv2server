@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"log"
 	"time"
 
 	"crypto/sha256"
@@ -69,7 +68,7 @@ func HashPassword(password string) (string, error) {
 	hashedPassword := sha256.New()
 	hashedPassword.Write([]byte(password))
 	encodedPassword := hex.EncodeToString(hashedPassword.Sum(nil))
-	log.Printf("Encoded password: %s", encodedPassword)
+
 	return encodedPassword, nil
 }
 

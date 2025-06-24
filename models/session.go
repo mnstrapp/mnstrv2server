@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 	"errors"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,9 +30,6 @@ func LogIn(email, password string) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("Password: %s", password)
-	log.Printf("Hashed password: %s", hashedPassword)
 
 	query := `
 		SELECT id, display_name, email, password_hash, qr_code, created_at, updated_at FROM users WHERE email = $1 AND password_hash = $2
