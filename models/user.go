@@ -2,13 +2,16 @@ package models
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"time"
+
+	"crypto/sha256"
 
 	"github.com/google/uuid"
 	"github.com/mnstrapp/mnstrv2server/database"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
@@ -62,12 +65,12 @@ func (u *User) Validate() error {
 	return nil
 }
 
-func (u *User) HashPassword() (string, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	return string(hashedPassword), nil
+func HashPassword(password string) (string, error) {
+	hashedPassword := sha256.New()
+	hashedPassword.Write([]byte(password))
+	encodedPassword := hex.EncodeToString(hashedPassword.Sum(nil))
+	log.Printf("Encoded password: %s", encodedPassword)
+	return encodedPassword, nil
 }
 
 func (u *User) Create() error {
@@ -77,7 +80,7 @@ func (u *User) Create() error {
 	}
 	defer db.Close(context.Background())
 
-	hashedPassword, err := u.HashPassword()
+	hashedPassword, err := HashPassword(u.Password)
 	if err != nil {
 		return err
 	}

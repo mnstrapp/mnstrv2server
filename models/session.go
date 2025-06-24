@@ -3,11 +3,11 @@ package models
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mnstrapp/mnstrv2server/database"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Session struct {
@@ -27,10 +27,13 @@ func LogIn(email, password string) (*Session, error) {
 	}
 	defer db.Close(context.Background())
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hashedPassword, err := HashPassword(password)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("Password: %s", password)
+	log.Printf("Hashed password: %s", hashedPassword)
 
 	query := `
 		SELECT id, display_name, email, password_hash, qr_code, created_at, updated_at FROM users WHERE email = $1 AND password_hash = $2
@@ -56,6 +59,7 @@ func LogIn(email, password string) (*Session, error) {
 	}
 
 	session := Session{
+		ID:     uuid.New().String(),
 		UserID: user.ID,
 		Token:  uuid.New().String(),
 	}
