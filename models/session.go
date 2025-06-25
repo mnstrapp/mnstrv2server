@@ -32,7 +32,7 @@ func LogIn(email, password string) (*Session, error) {
 	}
 
 	query := `
-		SELECT id, display_name, email, password_hash, qr_code, created_at, updated_at FROM users WHERE email = $1 AND password_hash = $2
+		SELECT id, display_name, email, password_hash, qr_code, created_at, updated_at FROM users WHERE email = $1 AND password_hash = $2 LIMIT 1
 	`
 
 	rows, err := db.Query(context.Background(), query, email, hashedPassword)
@@ -50,6 +50,8 @@ func LogIn(email, password string) (*Session, error) {
 		}
 	}
 
+	rows.Close()
+
 	if user.ID == "" {
 		return nil, errors.New("user not found")
 	}
@@ -58,6 +60,16 @@ func LogIn(email, password string) (*Session, error) {
 		ID:     uuid.New().String(),
 		UserID: user.ID,
 		Token:  uuid.New().String(),
+	}
+
+	query = `
+		INSERT INTO sessions (id, user_id, session_token, created_at, updated_at, expires_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, user_id, session_token, created_at, updated_at, expires_at
+	`
+
+	err = db.QueryRow(context.Background(), query, session.ID, session.UserID, session.Token, session.CreatedAt, session.UpdatedAt, session.ExpiresAt).
+		Scan(&session.ID, &session.UserID, &session.Token, &session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt)
+	if err != nil {
+		return nil, err
 	}
 
 	return &session, nil
