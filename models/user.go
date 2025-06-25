@@ -18,7 +18,7 @@ type User struct {
 	DisplayName string    `json:"displayName" db:"display_name"`
 	Email       string    `json:"-" db:"email"`
 	Password    string    `json:"-" db:"password_hash"`
-	QRCode      string    `json:"-" db:"qr_code"`
+	QRCode      string    `json:"qrCode" db:"qr_code"`
 	CreatedAt   time.Time `json:"-" db:"created_at"`
 	UpdatedAt   time.Time `json:"-" db:"updated_at"`
 	ArchivedAt  time.Time `json:"-" db:"archived_at"`

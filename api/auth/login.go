@@ -64,6 +64,11 @@ func sendLoginSuccess(w http.ResponseWriter, session models.Session, user models
 
 	log.Printf("Login success: %s", user.DisplayName)
 	log.Printf("Session: %s", session.ID)
+	userJSON, err := user.ToJSON()
+	if err != nil {
+		log.Printf("Error serializing user: %s", err.Error())
+	}
+	log.Printf("User: %s", string(userJSON))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Status", strconv.Itoa(http.StatusOK))

@@ -63,7 +63,7 @@ func LogIn(email, password string) (*Session, error) {
 	return &session, nil
 }
 
-func Logout(sessionID string) error {
+func Logout(token string) error {
 	db, err := database.Connection()
 	if err != nil {
 		return err
@@ -71,10 +71,10 @@ func Logout(sessionID string) error {
 	defer db.Close(context.Background())
 
 	query := `
-		UPDATE sessions SET archived_at = $1 WHERE id = $2
+		UPDATE sessions SET archived_at = now() WHERE session_token = $1
 	`
 
-	_, err = db.Exec(context.Background(), query, time.Now(), sessionID)
+	_, err = db.Exec(context.Background(), query, token)
 	if err != nil {
 		return err
 	}
