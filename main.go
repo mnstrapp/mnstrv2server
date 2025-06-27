@@ -10,6 +10,7 @@ import (
 
 	"github.com/mnstrapp/mnstrv2server/api/auth"
 	"github.com/mnstrapp/mnstrv2server/api/logger"
+	"github.com/mnstrapp/mnstrv2server/api/mnstrs/collect"
 	"github.com/mnstrapp/mnstrv2server/api/users"
 )
 
@@ -26,6 +27,7 @@ func init() {
 func main() {
 	http.Handle("/api/auth/", logger.NewLogger(auth.NewHandler()))
 	http.Handle("/api/users/", logger.NewLogger(users.NewHandler()))
+	http.Handle("/api/mnstrs/collect/", logger.NewLogger(collect.NewHandler()))
 
 	conn := fmt.Sprintf("%s:%d", host, port)
 	log.Printf("Serving mnstr at %s", conn)
