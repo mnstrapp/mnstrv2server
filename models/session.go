@@ -93,3 +93,36 @@ func Logout(token string) error {
 
 	return nil
 }
+
+func GetSession(ctx context.Context, token string) (*Session, error) {
+	db, err := database.Connection()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close(ctx)
+
+	query := `
+		SELECT id, user_id, session_token, created_at, updated_at, expires_at FROM sessions WHERE session_token = $1 AND archived_at IS NULL LIMIT 1
+	`
+
+	rows, err := db.Query(ctx, query, token)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var session Session
+
+	if rows.Next() {
+		err = rows.Scan(&session.ID, &session.UserID, &session.Token, &session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if session.ID == "" {
+		return nil, errors.New("session not found")
+	}
+
+	return &session, nil
+}
