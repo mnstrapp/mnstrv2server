@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -10,14 +11,25 @@ import (
 )
 
 type Mnstr struct {
-	ID        string `json:"id"`
-	UserID    string `json:"userId"`
-	Name      string `json:"name"`
-	Description string `json:"description"`
-	QRCode    string `json:"qrCode"`
-	CreatedAt time.Time `json:"-"`
-	UpdatedAt time.Time `json:"-"`
-	ArchivedAt time.Time `json:"-"`
+	ID          string    `json:"id"`
+	UserID      string    `json:"userId"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	QRCode      string    `json:"qrCode"`
+	CreatedAt   time.Time `json:"-"`
+	UpdatedAt   time.Time `json:"-"`
+	ArchivedAt  time.Time `json:"-"`
+}
+
+type FoundMnstr struct {
+	ID          string         `json:"id"`
+	UserID      string         `json:"userId"`
+	Name        sql.NullString `json:"name"`
+	Description sql.NullString `json:"description"`
+	QRCode      string         `json:"qrCode"`
+	CreatedAt   time.Time      `json:"-"`
+	UpdatedAt   time.Time      `json:"-"`
+	ArchivedAt  sql.NullTime   `json:"-"`
 }
 
 func NewMnstr(qrCode, userId string) *Mnstr {
@@ -37,7 +49,7 @@ func FindMnstrByQRCodeForUser(qrCode string, userId string) (*Mnstr, error) {
 	query := `
 		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at, archived_at
 		FROM mnstrs
-		WHERE mnstr_qr_code = $1 AND user_id = $2
+		WHERE mnstr_qr_code = $1 AND user_id = $2 LIMIT 1
 	`
 	rows, err := db.Query(context.Background(), query, qrCode, userId)
 	if err != nil {
@@ -45,14 +57,29 @@ func FindMnstrByQRCodeForUser(qrCode string, userId string) (*Mnstr, error) {
 	}
 	defer rows.Close()
 
-	var mnstr Mnstr
+	var foundMnstr FoundMnstr
 	if rows.Next() {
-		err = rows.Scan(&mnstr.ID, &mnstr.UserID, &mnstr.Name, &mnstr.Description, &mnstr.QRCode, &mnstr.CreatedAt, &mnstr.UpdatedAt, &mnstr.ArchivedAt)
+		err = rows.Scan(&foundMnstr.ID, &foundMnstr.UserID, &foundMnstr.Name, &foundMnstr.Description, &foundMnstr.QRCode, &foundMnstr.CreatedAt, &foundMnstr.UpdatedAt, &foundMnstr.ArchivedAt)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return &mnstr, nil
+	if foundMnstr.ID == "" {
+		return nil, errors.New("mnstr not found")
+	}
+
+	mnstr := &Mnstr{
+		ID:          foundMnstr.ID,
+		UserID:      foundMnstr.UserID,
+		Name:        foundMnstr.Name.String,
+		Description: foundMnstr.Description.String,
+		QRCode:      foundMnstr.QRCode,
+		CreatedAt:   foundMnstr.CreatedAt,
+		UpdatedAt:   foundMnstr.UpdatedAt,
+		ArchivedAt:  foundMnstr.ArchivedAt.Time,
+	}
+
+	return mnstr, nil
 }
 
 func (m *Mnstr) Create() error {
@@ -69,12 +96,11 @@ func (m *Mnstr) Create() error {
 	}
 	defer db.Close(context.Background())
 	m.ID = uuid.New().String()
-	m.CreatedAt = time.Now()
-	m.UpdatedAt = time.Now()
 
-	_, err = db.Exec(context.Background(), "INSERT INTO mnstrs (id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)", m.ID, m.UserID, m.Name, m.Description, m.QRCode, m.CreatedAt, m.UpdatedAt)
+	err = db.QueryRow(context.Background(), "INSERT INTO mnstrs (id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at", m.ID, m.UserID, m.Name, m.Description, m.QRCode, m.CreatedAt, m.UpdatedAt).Scan(&m.ID, &m.UserID, &m.Name, &m.Description, &m.QRCode, &m.CreatedAt, &m.UpdatedAt)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

@@ -4,16 +4,17 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/mnstrapp/mnstrv2server/models"
 )
 
 type CollectRequest struct {
-	QRCode      string `json:"qrCode"`
+	QRCode string `json:"qrCode"`
 }
 
 type CollectResponse struct {
-	Error string `json:"error"`
+	Error string        `json:"error"`
 	Mnstr *models.Mnstr `json:"mnstr"`
 }
 
@@ -24,7 +25,7 @@ func HandleCollect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := models.GetSession(r.Context(), r.Header.Get("Authorization"))
+	session, err := models.GetSession(r.Context(), strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1))
 	if err != nil {
 		sendCollectError(w, err, http.StatusUnauthorized)
 		return
