@@ -2,7 +2,6 @@ package collect
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 
@@ -48,7 +47,6 @@ func HandleCollect(w http.ResponseWriter, r *http.Request) {
 }
 
 func sendCollectError(w http.ResponseWriter, err error, status int) {
-	log.Printf("Error collecting mnstr: %v", err)
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(CollectResponse{Error: err.Error()})
 }

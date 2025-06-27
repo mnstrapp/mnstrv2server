@@ -52,7 +52,6 @@ func HandleRegister(w http.ResponseWriter, r *http.Request) {
 		sendRegisterError(w, err, http.StatusInternalServerError)
 		return
 	}
-	log.Printf("User created: %s", user.DisplayName)
 	sendRegisterSuccess(w, *user)
 }
 
