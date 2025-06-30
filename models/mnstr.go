@@ -82,6 +82,52 @@ func FindMnstrByQRCodeForUser(qrCode string, userId string) (*Mnstr, error) {
 	return mnstr, nil
 }
 
+func GetMnstrsByUserID(userId string) ([]*Mnstr, error) {
+
+	db, err := database.Connection()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close(context.Background())
+
+	query := `
+		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at, archived_at
+		FROM mnstrs
+		WHERE user_id = $1
+	`
+	rows, err := db.Query(context.Background(), query, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mnstrs []*Mnstr
+	for rows.Next() {
+		var mnstr FoundMnstr
+		err = rows.Scan(&mnstr.ID, &mnstr.UserID, &mnstr.Name, &mnstr.Description, &mnstr.QRCode, &mnstr.CreatedAt, &mnstr.UpdatedAt, &mnstr.ArchivedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		if mnstr.ID == "" {
+			continue
+		}
+
+		mnstrs = append(mnstrs, &Mnstr{
+			ID:          mnstr.ID,
+			UserID:      mnstr.UserID,
+			Name:        mnstr.Name.String,
+			Description: mnstr.Description.String,
+			QRCode:      mnstr.QRCode,
+			CreatedAt:   mnstr.CreatedAt,
+			UpdatedAt:   mnstr.UpdatedAt,
+			ArchivedAt:  mnstr.ArchivedAt.Time,
+		})
+	}
+
+	return mnstrs, nil
+}
+
 func (m *Mnstr) Create() error {
 	if m.QRCode == "" {
 		return errors.New("qrCode is required")
