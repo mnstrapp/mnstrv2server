@@ -128,6 +128,48 @@ func GetMnstrsByUserID(userId string) ([]*Mnstr, error) {
 	return mnstrs, nil
 }
 
+func GetMnstrByID(id string, userId string) (*Mnstr, error) {
+	db, err := database.Connection()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close(context.Background())
+
+	query := `
+		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at, archived_at
+		FROM mnstrs
+		WHERE id = $1 AND user_id = $2
+	`
+	rows, err := db.Query(context.Background(), query, id, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mnstr FoundMnstr
+	if rows.Next() {
+		err = rows.Scan(&mnstr.ID, &mnstr.UserID, &mnstr.Name, &mnstr.Description, &mnstr.QRCode, &mnstr.CreatedAt, &mnstr.UpdatedAt, &mnstr.ArchivedAt)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if mnstr.ID == "" {
+		return nil, errors.New("mnstr not found")
+	}
+
+	return &Mnstr{
+		ID:          mnstr.ID,
+		UserID:      mnstr.UserID,
+		Name:        mnstr.Name.String,
+		Description: mnstr.Description.String,
+		QRCode:      mnstr.QRCode,
+		CreatedAt:   mnstr.CreatedAt,
+		UpdatedAt:   mnstr.UpdatedAt,
+		ArchivedAt:  mnstr.ArchivedAt.Time,
+	}, nil
+}
+
 func (m *Mnstr) Create() error {
 	if m.QRCode == "" {
 		return errors.New("qrCode is required")
@@ -144,6 +186,26 @@ func (m *Mnstr) Create() error {
 	m.ID = uuid.New().String()
 
 	err = db.QueryRow(context.Background(), "INSERT INTO mnstrs (id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at", m.ID, m.UserID, m.Name, m.Description, m.QRCode, m.CreatedAt, m.UpdatedAt).Scan(&m.ID, &m.UserID, &m.Name, &m.Description, &m.QRCode, &m.CreatedAt, &m.UpdatedAt)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Mnstr) Update() error {
+	db, err := database.Connection()
+	if err != nil {
+		return err
+	}
+	defer db.Close(context.Background())
+
+	query := `
+		UPDATE mnstrs
+		SET mnstr_name = $1, mnstr_description = $2, updated_at = $3
+		WHERE id = $4
+	`
+	_, err = db.Exec(context.Background(), query, m.Name, m.Description, m.UpdatedAt, m.ID)
 	if err != nil {
 		return err
 	}

@@ -2,26 +2,21 @@ package manage
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/mnstrapp/mnstrv2server/models"
 )
 
 type ManageResponse struct {
-	Error  string          `json:"error"`
-	Mnstrs []*models.Mnstr `json:"mnstrs"`
+	Error  string          `json:"error,omitempty"`
+	Mnstrs []*models.Mnstr `json:"mnstrs,omitempty"`
+	Mnstr  *models.Mnstr   `json:"mnstr,omitempty"`
 }
 
-func HandleManageList(w http.ResponseWriter, r *http.Request) {
-	session, err := models.GetSession(r.Context(), strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1))
-	if err != nil {
-		sendManageError(w, err, http.StatusUnauthorized)
-		return
-	}
-
+func HandleList(session *models.Session, w http.ResponseWriter, r *http.Request) {
 	mnstrs, err := models.GetMnstrsByUserID(session.UserID)
 	if err != nil {
 		log.Printf("Error getting mnstrs: %s", err.Error())
@@ -32,6 +27,57 @@ func HandleManageList(w http.ResponseWriter, r *http.Request) {
 		Mnstrs: mnstrs,
 	}
 	sendManageSuccess(w, manageResponse)
+}
+
+func HandleGet(session *models.Session, w http.ResponseWriter, r *http.Request) {
+	mnstrId := r.URL.Query().Get("mnstrId")
+	if mnstrId == "" {
+		sendManageError(w, errors.New("mnstrId is required"), http.StatusBadRequest)
+		return
+	}
+
+	mnstr, err := models.GetMnstrByID(mnstrId, session.UserID)
+	if err != nil {
+		sendManageError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	sendManageSuccess(w, ManageResponse{Mnstr: mnstr})
+}
+
+type EditRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func HandleEdit(session *models.Session, w http.ResponseWriter, r *http.Request) {
+	mnstrId := r.URL.Query().Get("mnstrId")
+	if mnstrId == "" {
+		sendManageError(w, errors.New("mnstrId is required"), http.StatusBadRequest)
+		return
+	}
+
+	mnstr, err := models.GetMnstrByID(mnstrId, session.UserID)
+	if err != nil {
+		sendManageError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	var editRequest EditRequest
+	err = json.NewDecoder(r.Body).Decode(&editRequest)
+	if err != nil {
+		sendManageError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	mnstr.Name = editRequest.Name
+	mnstr.Description = editRequest.Description
+	err = mnstr.Update()
+	if err != nil {
+		sendManageError(w, err, http.StatusInternalServerError)
+		return
+	}
+	sendManageSuccess(w, ManageResponse{Mnstr: mnstr})
 }
 
 func sendManageError(w http.ResponseWriter, err error, status int) {

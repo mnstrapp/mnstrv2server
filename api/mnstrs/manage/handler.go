@@ -15,17 +15,23 @@ func NewHandler() Handler {
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	_, err := models.GetSession(r.Context(), strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1))
+	session, err := models.GetSession(r.Context(), strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1))
 	if err != nil {
 		sendManageError(w, err, http.StatusUnauthorized)
 		return
 	}
 
 	switch r.Method {
-	case http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete:
+	case http.MethodPost, http.MethodDelete:
 		w.WriteHeader(404)
 		log.Printf("Route not found: %s", r.URL.Path)
 	case http.MethodGet:
-		HandleManageList(w, r)
+		if r.URL.Query().Get("mnstrId") != "" {
+			HandleGet(session, w, r)
+		} else {
+			HandleList(session, w, r)
+		}
+	case http.MethodPatch, http.MethodPut:
+		HandleEdit(session, w, r)
 	}
 }
