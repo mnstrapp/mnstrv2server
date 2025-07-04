@@ -1,5 +1,7 @@
 package models
 
+//go:generate go run ../generators/mnstr_xp.go
+
 import (
 	"context"
 	"database/sql"
@@ -9,6 +11,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/mnstrapp/mnstrv2server/database"
 )
+
+func XPForMnstrLevel(level int) int {
+	if level > len(mnstrXPForLevel)-1 {
+		return mnstrXPForLevel[len(mnstrXPForLevel)-1]
+	}
+	return mnstrXPForLevel[level]
+}
 
 type Mnstr struct {
 	ID          string    `json:"id"`
@@ -186,6 +195,15 @@ func (m *Mnstr) Create() error {
 	m.ID = uuid.New().String()
 
 	err = db.QueryRow(context.Background(), "INSERT INTO mnstrs (id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at", m.ID, m.UserID, m.Name, m.Description, m.QRCode, m.CreatedAt, m.UpdatedAt).Scan(&m.ID, &m.UserID, &m.Name, &m.Description, &m.QRCode, &m.CreatedAt, &m.UpdatedAt)
+	if err != nil {
+		return err
+	}
+	user, err := FindUserByID(m.UserID)
+	if err != nil {
+		return err
+	}
+
+	err = user.UpdateXP(XPForMnstrLevel(user.ExperienceLevel))
 	if err != nil {
 		return err
 	}
