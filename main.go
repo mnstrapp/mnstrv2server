@@ -28,6 +28,7 @@ func init() {
 func main() {
 	http.Handle("/api/auth", logger.NewLogger(auth.NewHandler()))
 	http.Handle("/api/users", logger.NewLogger(users.NewHandler()))
+	http.Handle("/api/users/{userId}", logger.NewLogger(users.NewHandler()))
 	http.Handle("/api/mnstrs/collect", logger.NewLogger(collect.NewHandler()))
 	http.Handle("/api/mnstrs/manage", logger.NewLogger(manage.NewHandler()))
 	http.Handle("/api/mnstrs/manage/{mnstrId}", logger.NewLogger(manage.NewHandler()))
