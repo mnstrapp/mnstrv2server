@@ -14,21 +14,22 @@ import (
 )
 
 type User struct {
-	ID               string    `json:"id" db:"id"`
-	DisplayName      string    `json:"displayName" db:"display_name"`
-	Email            string    `json:"-" db:"email"`
-	Password         string    `json:"-" db:"password_hash"`
-	QRCode           string    `json:"qrCode" db:"qr_code"`
-	ExperienceLevel  int       `json:"experienceLevel" db:"experience_level"`
-	ExperiencePoints int       `json:"experiencePoints" db:"experience_points"`
-	CreatedAt        time.Time `json:"-" db:"created_at"`
-	UpdatedAt        time.Time `json:"-" db:"updated_at"`
-	ArchivedAt       time.Time `json:"-" db:"archived_at"`
+	ID                    string    `json:"id" db:"id"`
+	DisplayName           string    `json:"displayName" db:"display_name"`
+	Email                 string    `json:"-" db:"email"`
+	Password              string    `json:"-" db:"password_hash"`
+	QRCode                string    `json:"qrCode" db:"qr_code"`
+	ExperienceLevel       int       `json:"experienceLevel" db:"experience_level"`
+	ExperiencePoints      int       `json:"experiencePoints" db:"experience_points"`
+	ExperienceToNextLevel int       `json:"experienceToNextLevel"`
+	CreatedAt             time.Time `json:"-" db:"created_at"`
+	UpdatedAt             time.Time `json:"-" db:"updated_at"`
+	ArchivedAt            time.Time `json:"-" db:"archived_at"`
 }
 
 func NewUser(displayName, email, password, qrCode string) (*User, error) {
 	id := uuid.New().String()
-	return &User{
+	u := User{
 		ID:               id,
 		DisplayName:      displayName,
 		Email:            email,
@@ -39,7 +40,9 @@ func NewUser(displayName, email, password, qrCode string) (*User, error) {
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
 		ArchivedAt:       time.Time{},
-	}, nil
+	}
+	u.ExperienceToNextLevel = XPForLevel(u.ExperienceLevel + 1)
+	return &u, nil
 }
 
 func FromJSON(data []byte) (*User, error) {
@@ -52,6 +55,7 @@ func FromJSON(data []byte) (*User, error) {
 }
 
 func (u *User) ToJSON() ([]byte, error) {
+	u.ExperienceToNextLevel = XPForLevel(u.ExperienceLevel + 1)
 	return json.Marshal(u)
 }
 

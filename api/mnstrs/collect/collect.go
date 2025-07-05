@@ -15,6 +15,7 @@ type CollectRequest struct {
 type CollectResponse struct {
 	Error string        `json:"error"`
 	Mnstr *models.Mnstr `json:"mnstr"`
+	User  *models.User  `json:"user"`
 }
 
 func HandleCollect(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +34,13 @@ func HandleCollect(w http.ResponseWriter, r *http.Request) {
 	mnstr, _ := models.FindMnstrByQRCodeForUser(req.QRCode, session.UserID)
 
 	if mnstr != nil {
-		sendCollectSuccess(w, mnstr)
+		user, err := models.FindUserByID(session.UserID)
+		if err != nil {
+			sendCollectError(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		sendCollectSuccess(w, mnstr, user)
 		return
 	}
 
@@ -43,7 +50,13 @@ func HandleCollect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendCollectSuccess(w, mnstr)
+	user, err := models.FindUserByID(session.UserID)
+	if err != nil {
+		sendCollectError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	sendCollectSuccess(w, mnstr, user)
 }
 
 func sendCollectError(w http.ResponseWriter, err error, status int) {
@@ -51,6 +64,6 @@ func sendCollectError(w http.ResponseWriter, err error, status int) {
 	json.NewEncoder(w).Encode(CollectResponse{Error: err.Error()})
 }
 
-func sendCollectSuccess(w http.ResponseWriter, mnstr *models.Mnstr) {
-	json.NewEncoder(w).Encode(CollectResponse{Mnstr: mnstr})
+func sendCollectSuccess(w http.ResponseWriter, mnstr *models.Mnstr, user *models.User) {
+	json.NewEncoder(w).Encode(CollectResponse{Mnstr: mnstr, User: user})
 }
