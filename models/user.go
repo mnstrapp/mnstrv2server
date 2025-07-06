@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -43,20 +42,6 @@ func NewUser(displayName, email, password, qrCode string) (*User, error) {
 	}
 	u.ExperienceToNextLevel = XPForLevel(u.ExperienceLevel + 1)
 	return &u, nil
-}
-
-func FromJSON(data []byte) (*User, error) {
-	var u User
-	err := json.Unmarshal(data, &u)
-	if err != nil {
-		return nil, err
-	}
-	return &u, nil
-}
-
-func (u *User) ToJSON() ([]byte, error) {
-	u.ExperienceToNextLevel = XPForLevel(u.ExperienceLevel + 1)
-	return json.Marshal(u)
 }
 
 func (u *User) Validate() error {
@@ -122,6 +107,7 @@ func (u *User) UpdateXP(xp int) error {
 	} else {
 		u.ExperiencePoints += xp
 	}
+	u.ExperienceToNextLevel = XPForLevel(u.ExperienceLevel + 1)
 
 	db, err := database.Connection()
 	if err != nil {
@@ -166,6 +152,7 @@ func FindUserByID(id string) (*User, error) {
 	if user.ID == "" {
 		return nil, errors.New("user not found")
 	}
+	user.ExperienceToNextLevel = XPForLevel(user.ExperienceLevel + 1)
 
 	return &user, nil
 }

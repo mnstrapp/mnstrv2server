@@ -26,7 +26,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 		log.Printf("Route not found: %s", r.URL.Path)
 	case http.MethodGet:
-		if r.URL.Query().Get("mnstrId") != "" {
+		mnstrId := r.PathValue("mnstrId")
+		if mnstrId != "" {
 			HandleGet(session, w, r)
 		} else {
 			HandleList(session, w, r)
