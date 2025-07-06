@@ -10,12 +10,12 @@ import (
 )
 
 func main() {
-	levels := make([]int, 41)
+	levels := make([]int, 101)
 	levels[0] = 50
 
 	for level := 1; level < len(levels); level++ {
 		previousXP := levels[level-1]
-		levels[level] = int(math.Ceil(float64(previousXP) * 1.5))
+		levels[level] = int(previousXP + int(math.Ceil(math.Log10(float64(previousXP)))*10))
 	}
 
 	timestamp := time.Now().Format("2006-01-02 15:04:05")

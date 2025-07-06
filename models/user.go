@@ -127,6 +127,7 @@ func (u *User) UpdateXP(xp int) error {
 	if err != nil {
 		return err
 	}
+	defer db.Close(context.Background())
 
 	_, err = db.Exec(context.Background(), query, u.ExperienceLevel, u.ExperiencePoints, u.ID)
 	if err != nil {

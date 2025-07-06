@@ -3,11 +3,9 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"log"
 
-	"github.com/mnstrapp/mnstrv2server/database"
 	"github.com/mnstrapp/mnstrv2server/models"
 )
 
@@ -18,12 +16,6 @@ func init() {
 }
 
 func main() {
-	db, err := database.Connection()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close(context.Background())
-
 	log.Printf("Finding user %s\n", *userId)
 	user, err := models.FindUserByID(*userId)
 	if err != nil {
