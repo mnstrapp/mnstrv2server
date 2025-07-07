@@ -4,6 +4,7 @@ package models
 
 import (
 	"context"
+	"crypto/sha1"
 	"database/sql"
 	"errors"
 	"time"
@@ -208,7 +209,12 @@ func (m *Mnstr) Create() error {
 		return err
 	}
 
-	return nil
+	coins, err := m.Coins()
+	if err != nil {
+		return err
+	}
+
+	return user.AddCoins(coins)
 }
 
 func (m *Mnstr) Update() error {
@@ -229,4 +235,51 @@ func (m *Mnstr) Update() error {
 	}
 
 	return nil
+}
+
+func (m *Mnstr) Coins() (int64, error) {
+	hash := sha1.New()
+	hash.Write([]byte(m.QRCode))
+	hashBytes := hash.Sum(nil)
+	coinsByte := hashBytes[len(hashBytes)/2]
+	multiplierByte := hashBytes[len(hashBytes)/2+1]
+
+	coins := int64(coinsByte)
+	if coins <= 0 {
+		coins = 5
+	}
+	multiplier := int64(multiplierByte)
+	if multiplier <= 0 {
+		multiplier = 10
+	}
+
+	if multiplier >= 251 {
+		coins = (coins * (multiplier / 100)) + 1000
+		if coins > 2000 {
+			coins = 2000
+		}
+	} else if multiplier >= 242 {
+		coins = (coins * (multiplier / 100)) + 400
+		if coins > 750 {
+			coins = 750
+		}
+	} else if multiplier >= 216 {
+		coins = (coins * (multiplier / 100)) + 150
+		if coins > 400 {
+			coins = 400
+		}
+	} else {
+		if multiplier >= 85 {
+			coins = coins * int64(multiplier/100)
+		}
+		if coins > 25 {
+			coins = coins / 10
+		}
+	}
+
+	if coins <= 5 {
+		return 5, nil
+	}
+
+	return coins, nil
 }
