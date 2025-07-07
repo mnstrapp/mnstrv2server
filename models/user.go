@@ -76,6 +76,10 @@ func FindUserByID(id string) (*User, error) {
 		return nil, errors.New("user not found")
 	}
 	user.ExperienceToNextLevel = XPForLevel(user.ExperienceLevel + 1)
+	user.Coins, err = user.GetCoins()
+	if err != nil {
+		return nil, err
+	}
 
 	return &user, nil
 }
