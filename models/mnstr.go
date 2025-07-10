@@ -104,6 +104,7 @@ func GetMnstrsByUserID(userId string) ([]*Mnstr, error) {
 		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at, archived_at
 		FROM mnstrs
 		WHERE user_id = $1
+		ORDER BY created_at ASC
 	`
 	rows, err := db.Query(context.Background(), query, userId)
 	if err != nil {

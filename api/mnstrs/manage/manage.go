@@ -30,7 +30,7 @@ func HandleList(session *models.Session, w http.ResponseWriter, r *http.Request)
 }
 
 func HandleGet(session *models.Session, w http.ResponseWriter, r *http.Request) {
-	mnstrId := r.URL.Query().Get("mnstrId")
+	mnstrId := r.PathValue("mnstrId")
 	if mnstrId == "" {
 		sendManageError(w, errors.New("mnstrId is required"), http.StatusBadRequest)
 		return
@@ -51,7 +51,7 @@ type EditRequest struct {
 }
 
 func HandleEdit(session *models.Session, w http.ResponseWriter, r *http.Request) {
-	mnstrId := r.URL.Query().Get("mnstrId")
+	mnstrId := r.PathValue("mnstrId")
 	if mnstrId == "" {
 		sendManageError(w, errors.New("mnstrId is required"), http.StatusBadRequest)
 		return
