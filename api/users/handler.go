@@ -2,7 +2,6 @@ package users
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 )
 
@@ -19,7 +18,6 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Route not found")
 	case http.MethodGet:
 		userId := r.PathValue("userId")
-		log.Printf("userId: %s", userId)
 		if userId == "" {
 			w.WriteHeader(404)
 			fmt.Fprintf(w, "Route not found")
@@ -35,7 +33,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		HandleRegister(w, r)
 	case http.MethodDelete:
-		userId := r.URL.Query().Get("userId")
+		userId := r.PathValue("userId")
 		if userId != "" {
 			w.WriteHeader(404)
 			fmt.Fprintf(w, "Route not found")
