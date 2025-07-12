@@ -25,20 +25,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			HandleShow(userId, w, r)
 		}
 	case http.MethodPost:
-		userId := r.PathValue("userId")
-		if userId == "" {
-			w.WriteHeader(404)
-			fmt.Fprintf(w, "Route not found")
-			return
-		}
 		HandleRegister(w, r)
 	case http.MethodDelete:
-		userId := r.PathValue("userId")
-		if userId != "" {
-			w.WriteHeader(404)
-			fmt.Fprintf(w, "Route not found")
-			return
-		}
 		HandleUnregister(w, r)
 	}
 }
