@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"log"
 	"time"
 
 	"crypto/sha256"
@@ -59,6 +60,7 @@ func FindUserByID(id string) (*User, error) {
 
 	rows, err := db.Query(context.Background(), query, id)
 	if err != nil {
+		log.Printf("error finding user by id: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -68,16 +70,19 @@ func FindUserByID(id string) (*User, error) {
 	if rows.Next() {
 		err = rows.Scan(&user.ID, &user.DisplayName, &user.Email, &user.Password, &user.QRCode, &user.ExperienceLevel, &user.ExperiencePoints)
 		if err != nil {
+			log.Printf("error scanning user by id: %v", err)
 			return nil, err
 		}
 	}
 
 	if user.ID == "" {
+		log.Printf("user not found")
 		return nil, errors.New("user not found")
 	}
 	user.ExperienceToNextLevel = XPForLevel(user.ExperienceLevel + 1)
 	user.Coins, err = user.GetCoins()
 	if err != nil {
+		log.Printf("error getting coins: %v", err)
 		return nil, err
 	}
 
@@ -108,12 +113,14 @@ func (u *User) Validate() error {
 func (u *User) Create() error {
 	db, err := database.Connection()
 	if err != nil {
+		log.Printf("error creating user: %v", err)
 		return err
 	}
 	defer db.Close(context.Background())
 
 	hashedPassword, err := HashPassword(u.Password)
 	if err != nil {
+		log.Printf("error hashing password: %v", err)
 		return err
 	}
 
@@ -124,23 +131,27 @@ func (u *User) Create() error {
 
 	_, err = db.Exec(context.Background(), query, u.ID, u.DisplayName, u.Email, hashedPassword, u.QRCode, u.ExperienceLevel, u.ExperiencePoints, u.CreatedAt, u.UpdatedAt)
 	if err != nil {
+		log.Printf("error creating wallet: %v", err)
 		return err
 	}
-	
+
 	err = u.CreateWallet()
 	if err != nil {
+		log.Printf("error creating mnstr: %v", err)
 		return err
 	}
 
 	mnstr := NewMnstr(u.QRCode, u.ID)
 	err = mnstr.Create()
 	if err != nil {
+		log.Printf("error creating mnstr: %v", err)
 		return err
 	}
 	
 	mnstr.Name = u.DisplayName
 	err = mnstr.Update()
 	if err != nil {
+		log.Printf("error updating mnstr: %v", err)
 		return err
 	}
 
@@ -168,12 +179,14 @@ func (u *User) UpdateXP(xp int) error {
 
 	db, err := database.Connection()
 	if err != nil {
+		log.Printf("error getting database connection: %v", err)
 		return err
 	}
 	defer db.Close(context.Background())
 
 	_, err = db.Exec(context.Background(), query, u.ExperienceLevel, u.ExperiencePoints, u.ID)
 	if err != nil {
+		log.Printf("error updating xp: %v", err)
 		return err
 	}
 
@@ -186,9 +199,11 @@ func (u *User) GetWallet() (*Wallet, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			err = u.CreateWallet()
 			if err != nil {
+				log.Printf("error creating wallet: %v", err)
 				return nil, err
 			}
 		} else {
+			log.Printf("error getting wallet: %v", err)
 			return nil, err
 		}
 
@@ -206,16 +221,19 @@ func (u *User) CreateWallet() error {
 func (u *User) AddCoins(amount int64) error {
 	wallet, err := u.GetWallet()
 	if err != nil {
+		log.Printf("error getting wallet: %v", err)
 		return err
 	}
 
 	err = wallet.AddCoins(amount)
 	if err != nil {
+		log.Printf("error adding coins: %v", err)
 		return err
 	}
 
 	coins, err := wallet.GetCoins()
 	if err != nil {
+		log.Printf("error getting coins: %v", err)
 		return err
 	}
 
@@ -227,6 +245,7 @@ func (u *User) AddCoins(amount int64) error {
 func (u *User) AddCash(amount int64) error {
 	wallet, err := u.GetWallet()
 	if err != nil {
+		log.Printf("error getting wallet: %v", err)
 		return err
 	}
 
@@ -236,6 +255,7 @@ func (u *User) AddCash(amount int64) error {
 func (u *User) RemoveCoins(amount int64) error {
 	wallet, err := u.GetWallet()
 	if err != nil {
+		log.Printf("error getting wallet: %v", err)
 		return err
 	}
 
@@ -245,6 +265,7 @@ func (u *User) RemoveCoins(amount int64) error {
 func (u *User) RemoveCash(amount int64) error {
 	wallet, err := u.GetWallet()
 	if err != nil {
+		log.Printf("error getting wallet: %v", err)
 		return err
 	}
 
@@ -254,6 +275,7 @@ func (u *User) RemoveCash(amount int64) error {
 func (u *User) GetCoins() (int64, error) {
 	wallet, err := u.GetWallet()
 	if err != nil {
+		log.Printf("error getting wallet: %v", err)
 		return 0, err
 	}
 
@@ -263,6 +285,7 @@ func (u *User) GetCoins() (int64, error) {
 func (u *User) GetCash() (int64, error) {
 	wallet, err := u.GetWallet()
 	if err != nil {
+		log.Printf("error getting wallet: %v", err)
 		return 0, err
 	}
 

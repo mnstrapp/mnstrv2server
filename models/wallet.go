@@ -237,13 +237,17 @@ func (w *Wallet) GetCoins() (int64, error) {
 	`
 	row := db.QueryRow(context.Background(), query, w.ID, string(TransactionTypeCoin), string(TransactionStatusCompleted), w.UserID)
 
-	var coins int64
+	var coins sql.NullInt64
 	err = row.Scan(&coins)
 	if err != nil {
 		return 0, err
 	}
 
-	return coins, nil
+	if !coins.Valid {
+		return 0, nil
+	}
+
+	return coins.Int64, nil
 }
 
 func (w *Wallet) GetCash() (int64, error) {
