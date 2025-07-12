@@ -127,6 +127,18 @@ func (u *User) Create() error {
 		return err
 	}
 
+	mnstr := NewMnstr(u.QRCode, u.ID)
+	err = mnstr.Create()
+	if err != nil {
+		return err
+	}
+	
+	mnstr.Name = u.DisplayName
+	err = mnstr.Update()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
