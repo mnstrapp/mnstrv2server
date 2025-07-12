@@ -126,6 +126,11 @@ func (u *User) Create() error {
 	if err != nil {
 		return err
 	}
+	
+	err = u.CreateWallet()
+	if err != nil {
+		return err
+	}
 
 	mnstr := NewMnstr(u.QRCode, u.ID)
 	err = mnstr.Create()
