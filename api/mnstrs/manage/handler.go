@@ -26,12 +26,18 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 		log.Printf("Route not found: %s", r.URL.Path)
 	case http.MethodGet:
+		qrCode := r.PathValue("qrCode")
+		if qrCode != "" {
+			HandleGetByQRCode(session, w, r)
+			return
+		}
+
 		mnstrId := r.PathValue("mnstrId")
 		if mnstrId != "" {
 			HandleGet(session, w, r)
-		} else {
-			HandleList(session, w, r)
+			return
 		}
+		HandleList(session, w, r)
 	case http.MethodPatch, http.MethodPut:
 		HandleEdit(session, w, r)
 	}

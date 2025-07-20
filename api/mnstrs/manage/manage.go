@@ -45,6 +45,22 @@ func HandleGet(session *models.Session, w http.ResponseWriter, r *http.Request) 
 	sendManageSuccess(w, ManageResponse{Mnstr: mnstr})
 }
 
+func HandleGetByQRCode(session *models.Session, w http.ResponseWriter, r *http.Request) {
+	qrCode := r.PathValue("qrCode")
+	if qrCode == "" {
+		sendManageError(w, errors.New("qrCode is required"), http.StatusBadRequest)
+		return
+	}
+
+	mnstr, err := models.GetMnstrByQRCode(qrCode)
+	if err != nil {
+		sendManageError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	sendManageSuccess(w, ManageResponse{Mnstr: mnstr})
+}
+
 type EditRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`

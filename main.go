@@ -32,6 +32,7 @@ func main() {
 	http.Handle("/api/mnstrs/collect", logger.NewLogger(collect.NewHandler()))
 	http.Handle("/api/mnstrs/manage", logger.NewLogger(manage.NewHandler()))
 	http.Handle("/api/mnstrs/manage/{mnstrId}", logger.NewLogger(manage.NewHandler()))
+	http.Handle("/api/mnstrs/manage/qrcode/{qrCode}", logger.NewLogger(manage.NewHandler()))
 
 	conn := fmt.Sprintf("%s:%d", host, port)
 	log.Printf("Serving mnstr at %s", conn)
