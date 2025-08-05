@@ -104,6 +104,38 @@ func NewMnstrFromFoundMnstr(foundMnstr FoundMnstr) *Mnstr {
 	}
 }
 
+func FindAllMnstrs() ([]*Mnstr, error) {
+	db, err := database.Connection()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close(context.Background())
+
+	query := `
+		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, current_level, current_experience, current_health, max_health, current_attack, max_attack, current_defense, max_defense, current_speed, max_speed, current_intelligence, max_intelligence, current_magic, max_magic, created_at, updated_at, archived_at
+		FROM mnstrs
+		ORDER BY created_at ASC
+	`
+	rows, err := db.Query(context.Background(), query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mnstrs []*Mnstr
+	for rows.Next() {
+		var mnstr FoundMnstr
+		err = rows.Scan(&mnstr.ID, &mnstr.UserID, &mnstr.Name, &mnstr.Description, &mnstr.QRCode, &mnstr.Level, &mnstr.Experience, &mnstr.CurrentHealth, &mnstr.MaxHealth, &mnstr.CurrentAttack, &mnstr.MaxAttack, &mnstr.CurrentDefense, &mnstr.MaxDefense, &mnstr.CurrentSpeed, &mnstr.MaxSpeed, &mnstr.CurrentIntelligence, &mnstr.MaxIntelligence, &mnstr.CurrentMagic, &mnstr.MaxMagic, &mnstr.CreatedAt, &mnstr.UpdatedAt, &mnstr.ArchivedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		mnstrs = append(mnstrs, NewMnstrFromFoundMnstr(mnstr))
+	}
+
+	return mnstrs, nil
+}
+
 func FindMnstrByQRCodeForUser(qrCode string, userId string) (*Mnstr, error) {
 	db, err := database.Connection()
 	if err != nil {
@@ -115,6 +147,7 @@ func FindMnstrByQRCodeForUser(qrCode string, userId string) (*Mnstr, error) {
 		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, current_level, current_experience, current_health, max_health, current_attack, max_attack, current_defense, max_defense, current_speed, max_speed, current_intelligence, max_intelligence, current_magic, max_magic, created_at, updated_at, archived_at
 		FROM mnstrs
 		WHERE mnstr_qr_code = $1 AND user_id = $2 LIMIT 1
+		ORDER BY created_at ASC
 	`
 	rows, err := db.Query(context.Background(), query, qrCode, userId)
 	if err != nil {
@@ -187,6 +220,7 @@ func GetMnstrByID(id string, userId string) (*Mnstr, error) {
 		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, current_level, current_experience, current_health, max_health, current_attack, max_attack, current_defense, max_defense, current_speed, max_speed, current_intelligence, max_intelligence, current_magic, max_magic, created_at, updated_at, archived_at
 		FROM mnstrs
 		WHERE id = $1 AND user_id = $2
+		ORDER BY created_at ASC
 	`
 	rows, err := db.Query(context.Background(), query, id, userId)
 	if err != nil {
@@ -249,6 +283,13 @@ func (m *Mnstr) Create() error {
 	}
 	if m.UserID == "" {
 		return errors.New("userID is required")
+	}
+
+	if m.CreatedAt.IsZero() {
+		m.CreatedAt = time.Now()
+	}
+	if m.UpdatedAt.IsZero() {
+		m.UpdatedAt = m.CreatedAt
 	}
 
 	db, err := database.Connection()
@@ -393,6 +434,10 @@ func (m *Mnstr) Create() error {
 }
 
 func (m *Mnstr) Update() error {
+	if m.UpdatedAt.IsZero() {
+		m.UpdatedAt = time.Now()
+	}
+
 	db, err := database.Connection()
 	if err != nil {
 		return err
@@ -401,7 +446,7 @@ func (m *Mnstr) Update() error {
 
 	query := `
 		UPDATE mnstrs
-		SET mnstr_name = $1, mnstr_description = $2, current_level = $3, current_experience = $4, current_health = $5, max_health = $6, current_attack = $7, max_attack = $8, current_defense = $9, max_defense = $10, current_speed = $11, max_speed = $12, current_intelligence = $13, max_intelligence = $14, current_magic = $15, max_magic = $16, 	updated_at = $17
+		SET mnstr_name = $1, mnstr_description = $2, current_level = $3, current_experience = $4, current_health = $5, max_health = $6, current_attack = $7, max_attack = $8, current_defense = $9, max_defense = $10, current_speed = $11, max_speed = $12, current_intelligence = $13, max_intelligence = $14, current_magic = $15, max_magic = $16, updated_at = $17
 		WHERE id = $18
 	`
 	_, err = db.Exec(context.Background(), query, m.Name, m.Description, m.Level, m.Experience, m.CurrentHealth, m.MaxHealth, m.CurrentAttack, m.MaxAttack, m.CurrentDefense, m.MaxDefense, m.CurrentSpeed, m.MaxSpeed, m.CurrentIntelligence, m.MaxIntelligence, m.CurrentMagic, m.MaxMagic, m.UpdatedAt, m.ID)
