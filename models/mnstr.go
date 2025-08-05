@@ -112,7 +112,7 @@ func FindMnstrByQRCodeForUser(qrCode string, userId string) (*Mnstr, error) {
 	defer db.Close(context.Background())
 
 	query := `
-		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at, archived_at
+		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, current_level, current_experience, current_health, max_health, current_attack, max_attack, current_defense, max_defense, current_speed, max_speed, current_intelligence, max_intelligence, current_magic, max_magic, created_at, updated_at, archived_at
 		FROM mnstrs
 		WHERE mnstr_qr_code = $1 AND user_id = $2 LIMIT 1
 	`
@@ -124,7 +124,7 @@ func FindMnstrByQRCodeForUser(qrCode string, userId string) (*Mnstr, error) {
 
 	var foundMnstr FoundMnstr
 	if rows.Next() {
-		err = rows.Scan(&foundMnstr.ID, &foundMnstr.UserID, &foundMnstr.Name, &foundMnstr.Description, &foundMnstr.QRCode, &foundMnstr.CreatedAt, &foundMnstr.UpdatedAt, &foundMnstr.ArchivedAt)
+		err = rows.Scan(&foundMnstr.ID, &foundMnstr.UserID, &foundMnstr.Name, &foundMnstr.Description, &foundMnstr.QRCode, &foundMnstr.Level, &foundMnstr.Experience, &foundMnstr.CurrentHealth, &foundMnstr.MaxHealth, &foundMnstr.CurrentAttack, &foundMnstr.MaxAttack, &foundMnstr.CurrentDefense, &foundMnstr.MaxDefense, &foundMnstr.CurrentSpeed, &foundMnstr.MaxSpeed, &foundMnstr.CurrentIntelligence, &foundMnstr.MaxIntelligence, &foundMnstr.CurrentMagic, &foundMnstr.MaxMagic, &foundMnstr.CreatedAt, &foundMnstr.UpdatedAt, &foundMnstr.ArchivedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +147,7 @@ func GetMnstrsByUserID(userId string) ([]*Mnstr, error) {
 	defer db.Close(context.Background())
 
 	query := `
-		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at, archived_at
+		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, current_level, current_experience, current_health, max_health, current_attack, max_attack, current_defense, max_defense, current_speed, max_speed, current_intelligence, max_intelligence, current_magic, max_magic, created_at, updated_at, archived_at
 		FROM mnstrs
 		WHERE user_id = $1
 		ORDER BY created_at ASC
@@ -161,7 +161,7 @@ func GetMnstrsByUserID(userId string) ([]*Mnstr, error) {
 	var mnstrs []*Mnstr
 	for rows.Next() {
 		var mnstr FoundMnstr
-		err = rows.Scan(&mnstr.ID, &mnstr.UserID, &mnstr.Name, &mnstr.Description, &mnstr.QRCode, &mnstr.CreatedAt, &mnstr.UpdatedAt, &mnstr.ArchivedAt)
+		err = rows.Scan(&mnstr.ID, &mnstr.UserID, &mnstr.Name, &mnstr.Description, &mnstr.QRCode, &mnstr.Level, &mnstr.Experience, &mnstr.CurrentHealth, &mnstr.MaxHealth, &mnstr.CurrentAttack, &mnstr.MaxAttack, &mnstr.CurrentDefense, &mnstr.MaxDefense, &mnstr.CurrentSpeed, &mnstr.MaxSpeed, &mnstr.CurrentIntelligence, &mnstr.MaxIntelligence, &mnstr.CurrentMagic, &mnstr.MaxMagic, &mnstr.CreatedAt, &mnstr.UpdatedAt, &mnstr.ArchivedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -184,7 +184,7 @@ func GetMnstrByID(id string, userId string) (*Mnstr, error) {
 	defer db.Close(context.Background())
 
 	query := `
-		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at, archived_at
+		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, current_level, current_experience, current_health, max_health, current_attack, max_attack, current_defense, max_defense, current_speed, max_speed, current_intelligence, max_intelligence, current_magic, max_magic, created_at, updated_at, archived_at
 		FROM mnstrs
 		WHERE id = $1 AND user_id = $2
 	`
@@ -196,7 +196,7 @@ func GetMnstrByID(id string, userId string) (*Mnstr, error) {
 
 	var mnstr FoundMnstr
 	if rows.Next() {
-		err = rows.Scan(&mnstr.ID, &mnstr.UserID, &mnstr.Name, &mnstr.Description, &mnstr.QRCode, &mnstr.CreatedAt, &mnstr.UpdatedAt, &mnstr.ArchivedAt)
+		err = rows.Scan(&mnstr.ID, &mnstr.UserID, &mnstr.Name, &mnstr.Description, &mnstr.QRCode, &mnstr.Level, &mnstr.Experience, &mnstr.CurrentHealth, &mnstr.MaxHealth, &mnstr.CurrentAttack, &mnstr.MaxAttack, &mnstr.CurrentDefense, &mnstr.MaxDefense, &mnstr.CurrentSpeed, &mnstr.MaxSpeed, &mnstr.CurrentIntelligence, &mnstr.MaxIntelligence, &mnstr.CurrentMagic, &mnstr.MaxMagic, &mnstr.CreatedAt, &mnstr.UpdatedAt, &mnstr.ArchivedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -217,7 +217,7 @@ func GetMnstrByQRCode(qrCode string) (*Mnstr, error) {
 	defer db.Close(context.Background())
 
 	query := `
-		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, created_at, updated_at, archived_at
+		SELECT id, user_id, mnstr_name, mnstr_description, mnstr_qr_code, current_level, current_experience, current_health, max_health, current_attack, max_attack, current_defense, max_defense, current_speed, max_speed, current_intelligence, max_intelligence, current_magic, max_magic, created_at, updated_at, archived_at
 		FROM mnstrs
 		WHERE mnstr_qr_code = $1
 		LIMIT 1
@@ -230,7 +230,7 @@ func GetMnstrByQRCode(qrCode string) (*Mnstr, error) {
 
 	var mnstr FoundMnstr
 	if rows.Next() {
-		err = rows.Scan(&mnstr.ID, &mnstr.UserID, &mnstr.Name, &mnstr.Description, &mnstr.QRCode, &mnstr.CreatedAt, &mnstr.UpdatedAt, &mnstr.ArchivedAt)
+		err = rows.Scan(&mnstr.ID, &mnstr.UserID, &mnstr.Name, &mnstr.Description, &mnstr.QRCode, &mnstr.Level, &mnstr.Experience, &mnstr.CurrentHealth, &mnstr.MaxHealth, &mnstr.CurrentAttack, &mnstr.MaxAttack, &mnstr.CurrentDefense, &mnstr.MaxDefense, &mnstr.CurrentSpeed, &mnstr.MaxSpeed, &mnstr.CurrentIntelligence, &mnstr.MaxIntelligence, &mnstr.CurrentMagic, &mnstr.MaxMagic, &mnstr.CreatedAt, &mnstr.UpdatedAt, &mnstr.ArchivedAt)
 		if err != nil {
 			return nil, err
 		}
