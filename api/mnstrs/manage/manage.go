@@ -97,6 +97,7 @@ func HandleEdit(session *models.Session, w http.ResponseWriter, r *http.Request)
 }
 
 func sendManageError(w http.ResponseWriter, err error, status int) {
+	log.Printf("Error: %s", err.Error())
 	manageResponse := ManageResponse{
 		Error: err.Error(),
 	}

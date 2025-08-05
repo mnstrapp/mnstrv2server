@@ -401,7 +401,7 @@ func (m *Mnstr) Update() error {
 
 	query := `
 		UPDATE mnstrs
-		SET mnstr_name = $1, mnstr_description = $2, level = $3, experience = $4, current_health = $5, max_health = $6, current_attack = $7, max_attack = $8, current_defense = $9, max_defense = $10, current_speed = $11, max_speed = $12, current_intelligence = $13, max_intelligence = $14, current_magic = $15, max_magic = $16, 	updated_at = $17
+		SET mnstr_name = $1, mnstr_description = $2, current_level = $3, current_experience = $4, current_health = $5, max_health = $6, current_attack = $7, max_attack = $8, current_defense = $9, max_defense = $10, current_speed = $11, max_speed = $12, current_intelligence = $13, max_intelligence = $14, current_magic = $15, max_magic = $16, 	updated_at = $17
 		WHERE id = $18
 	`
 	_, err = db.Exec(context.Background(), query, m.Name, m.Description, m.Level, m.Experience, m.CurrentHealth, m.MaxHealth, m.CurrentAttack, m.MaxAttack, m.CurrentDefense, m.MaxDefense, m.CurrentSpeed, m.MaxSpeed, m.CurrentIntelligence, m.MaxIntelligence, m.CurrentMagic, m.MaxMagic, m.UpdatedAt, m.ID)
