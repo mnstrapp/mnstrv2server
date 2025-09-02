@@ -1,0 +1,83 @@
+use futures::stream;
+use juniper::{Context, FieldError, RootNode, graphql_object, graphql_subscription};
+use juniper_rocket::{GraphQLRequest, GraphQLResponse};
+use rocket::{Route, get, post, response::content::RawHtml};
+
+use crate::{find_one_resource_where_fields, models::session::Session, utils::token::RawToken};
+
+pub mod clients;
+pub mod internal;
+
+pub fn routes() -> Vec<Route> {
+    routes![graphiql, graphql]
+}
+
+pub struct Ctx {
+    pub session: Option<Session>,
+}
+
+impl Context for Ctx {}
+
+pub struct Query;
+
+#[graphql_object(context = Ctx)]
+impl Query {
+    async fn hello() -> &'static str {
+        "Hello, world!"
+    }
+}
+
+pub struct Mutation;
+
+#[graphql_object(context = Ctx)]
+impl Mutation {
+    async fn hello() -> &'static str {
+        "Hello, world!"
+    }
+}
+
+pub struct Subscription;
+
+#[graphql_subscription(context = Ctx)]
+impl Subscription {
+    async fn hello(_ctx: &Ctx) -> std::pin::Pin<Box<dyn futures::Stream<Item = String> + Send>> {
+        Box::pin(stream::once(async { "Hello, world!".to_string() }))
+    }
+}
+
+pub type Schema = RootNode<'static, Query, Mutation, Subscription>;
+
+#[get("/graphiql")]
+pub fn graphiql() -> RawHtml<String> {
+    juniper_rocket::graphiql_source("/graphql", None)
+}
+
+#[post("/", data = "<request>")]
+pub async fn graphql(request: GraphQLRequest, token: RawToken) -> GraphQLResponse {
+    let mut ctx = Ctx { session: None };
+    if !token.value.is_empty() {
+        let session = match verify_session_token(token).await {
+            Ok(session) => session,
+            Err(_) => {
+                return GraphQLResponse::error(FieldError::new(
+                    "Invalid session",
+                    juniper::Value::Null,
+                ));
+            }
+        };
+        ctx.session = Some(session);
+    }
+    let schema = Schema::new(Query, Mutation, Subscription);
+
+    request.execute(&schema, &ctx).await
+}
+
+async fn verify_session_token(token: RawToken) -> Result<Session, FieldError> {
+    let session_params = vec![("token", token.value.into())];
+    let session = match find_one_resource_where_fields!(Session, session_params).await {
+        Ok(session) => session,
+        Err(e) => return Err(e.into()),
+    };
+
+    Ok(session)
+}
