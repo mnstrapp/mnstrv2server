@@ -56,7 +56,7 @@ pub async fn delete_session(ctx: &Ctx) -> Result<bool, FieldError> {
     }
 
     let session = ctx.session.as_ref().unwrap();
-    println!("Deleting session: {:?}", session);
+
     match delete_resource_where_fields!(Session, vec![("id", session.id.clone().into())]).await {
         Ok(_) => Ok(true),
         Err(e) => {
