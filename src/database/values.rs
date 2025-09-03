@@ -153,11 +153,7 @@ impl FromIterator<bool> for DatabaseValue {
 
 impl FromIterator<OffsetDateTime> for DatabaseValue {
     fn from_iter<I: IntoIterator<Item = OffsetDateTime>>(iter: I) -> Self {
-        DatabaseValue::DateTime(
-            iter.into_iter()
-                .map(|dt| dt.format(&Iso8601::DEFAULT).unwrap().to_string())
-                .collect(),
-        )
+        DatabaseValue::DateTime(iter.into_iter().map(|dt| dt.to_string()).collect())
     }
 }
 
@@ -205,7 +201,7 @@ impl From<bool> for DatabaseValue {
 
 impl From<OffsetDateTime> for DatabaseValue {
     fn from(dt: OffsetDateTime) -> Self {
-        DatabaseValue::DateTime(dt.format(&Iso8601::DEFAULT).unwrap().to_string())
+        DatabaseValue::DateTime(dt.to_string())
     }
 }
 

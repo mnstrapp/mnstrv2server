@@ -47,7 +47,7 @@
 /// UPDATE users SET
 ///     email = $1,
 ///     name = $2,
-///     updated_at = CAST($3 AS TIMESTAMP)
+///     updated_at = CAST($3 AS TIMESTAMP WITH TIME ZONE)
 /// WHERE id = $4
 /// RETURNING *
 /// ```
@@ -56,8 +56,8 @@
 /// ```sql
 /// UPDATE sessions SET
 ///     token = $1,
-///     updated_at = CAST($2 AS TIMESTAMP),
-///     expires_at = CAST($3 AS TIMESTAMP)
+///     updated_at = CAST($2 AS TIMESTAMP WITH TIME ZONE),
+///     expires_at = CAST($3 AS TIMESTAMP WITH TIME ZONE)
 /// WHERE id = $4
 /// RETURNING *
 /// ```
@@ -66,7 +66,7 @@
 /// ```sql
 /// UPDATE contacts SET
 ///     phone = NULL,
-///     updated_at = CAST($1 AS TIMESTAMP)
+///     updated_at = CAST($1 AS TIMESTAMP WITH TIME ZONE)
 /// WHERE id = $2
 /// RETURNING *
 /// ```
@@ -82,7 +82,7 @@
 /// # Type Casting
 /// The macro automatically handles different DatabaseValue types:
 /// - **Strings**: Cast to VARCHAR with proper parameter binding
-/// - **Timestamps**: Cast to TIMESTAMP for date/time fields
+/// - **Timestamps**: Cast to TIMESTAMP WITH TIME ZONE for date/time fields
 /// - **Numbers**: Cast to appropriate numeric types (INTEGER, BIGINT, FLOAT)
 /// - **Booleans**: Cast to BOOLEAN for boolean fields
 /// - **NULL Values**: Handled specially to avoid binding issues
@@ -102,14 +102,12 @@ macro_rules! update_resource {
         use crate::find_one_resource_where_fields;
         use crate::utils::strings::camel_to_snake_case;
         use pluralizer::pluralize;
-        use time::{Duration, OffsetDateTime, format_description::well_known::Iso8601};
+        use time::{Duration, OffsetDateTime};
 
         async {
             let id = $id.to_string();
-            let updated_at = OffsetDateTime::now_utc().format(&Iso8601::DEFAULT).unwrap();
-            let expires_at = (OffsetDateTime::now_utc() + Duration::days(30))
-                .format(&Iso8601::DEFAULT)
-                .unwrap();
+            let updated_at = OffsetDateTime::now_utc();
+            let expires_at = (OffsetDateTime::now_utc() + Duration::days(30));
 
             let resource_name = pluralize(
                 camel_to_snake_case(stringify!($resource).to_string()).as_str(),
@@ -167,7 +165,11 @@ macro_rules! update_resource {
                         query.push_str(&format!("{} = ${}", field, i + 1));
                     }
                     DatabaseValue::DateTime(_) => {
-                        query.push_str(&format!("{} = CAST(${} AS TIMESTAMP)", field, i + 1));
+                        query.push_str(&format!(
+                            "{} = CAST(${} AS TIMESTAMP WITH TIME ZONE)",
+                            field,
+                            i + 1
+                        ));
                     }
                     DatabaseValue::Int(_) => {
                         query.push_str(&format!("{} = CAST(${} AS INTEGER)", field, i + 1));

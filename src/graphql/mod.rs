@@ -3,10 +3,17 @@ use juniper::{Context, FieldError, RootNode, graphql_object, graphql_subscriptio
 use juniper_rocket::{GraphQLRequest, GraphQLResponse};
 use rocket::{Route, get, post, response::content::RawHtml};
 
-use crate::{find_one_resource_where_fields, models::session::Session, utils::token::RawToken};
+use crate::{
+    find_one_resource_where_fields,
+    graphql::{sessions::SessionMutationType, users::mutations::UserMutationType},
+    models::session::Session,
+    utils::token::RawToken,
+};
 
 pub mod clients;
 pub mod internal;
+pub mod sessions;
+pub mod users;
 
 pub fn routes() -> Vec<Route> {
     routes![graphiql, graphql]
@@ -31,8 +38,12 @@ pub struct Mutation;
 
 #[graphql_object(context = Ctx)]
 impl Mutation {
-    async fn hello() -> &'static str {
-        "Hello, world!"
+    pub async fn session() -> SessionMutationType {
+        SessionMutationType
+    }
+
+    pub async fn users() -> UserMutationType {
+        UserMutationType
     }
 }
 
@@ -73,7 +84,7 @@ pub async fn graphql(request: GraphQLRequest, token: RawToken) -> GraphQLRespons
 }
 
 async fn verify_session_token(token: RawToken) -> Result<Session, FieldError> {
-    let session_params = vec![("token", token.value.into())];
+    let session_params = vec![("session_token", token.value.into())];
     let session = match find_one_resource_where_fields!(Session, session_params).await {
         Ok(session) => session,
         Err(e) => return Err(e.into()),

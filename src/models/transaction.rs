@@ -1,7 +1,7 @@
 use juniper::GraphQLObject;
 use serde::{Deserialize, Serialize};
 use sqlx::{Error, Row, postgres::PgRow};
-use time::{OffsetDateTime, format_description::well_known::Iso8601};
+use time::OffsetDateTime;
 
 use crate::{
     database::traits::DatabaseResource,
@@ -33,8 +33,8 @@ pub struct Transaction {
 
 impl DatabaseResource for Transaction {
     fn from_row(row: &PgRow) -> Result<Self, Error> {
-        let created_at = OffsetDateTime::parse(row.get("created_at"), &Iso8601::DEFAULT).ok();
-        let updated_at = OffsetDateTime::parse(row.get("updated_at"), &Iso8601::DEFAULT).ok();
+        let created_at = row.get("created_at");
+        let updated_at = row.get("updated_at");
 
         Ok(Transaction {
             id: row.get("id"),

@@ -40,7 +40,7 @@
 ///
 /// ## Soft Delete (Archivable Resource)
 /// ```sql
-/// UPDATE users SET archived_at = CAST($3 AS TIMESTAMP)
+/// UPDATE users SET archived_at = CAST($3 AS TIMESTAMP WITH TIME ZONE)
 /// WHERE organization_id = $1 AND status = $2
 /// ```
 ///
@@ -78,7 +78,7 @@ macro_rules! delete_resource_where_fields {
             let mut query: String;
             if <$resource as DatabaseResource>::is_archivable() {
                 query = format!(
-                    "UPDATE {} SET archived_at = CAST(${} AS TIMESTAMP) WHERE ",
+                    "UPDATE {} SET archived_at = CAST(${} AS TIMESTAMP WITH TIME ZONE) WHERE ",
                     resource_name,
                     fields.len() + 1
                 );

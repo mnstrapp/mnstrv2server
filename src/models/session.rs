@@ -1,14 +1,14 @@
 use juniper::GraphQLObject;
 use serde::{Deserialize, Serialize};
 use sqlx::{Error, Row, postgres::PgRow};
-use time::{OffsetDateTime, format_description::well_known::Iso8601};
+use time::OffsetDateTime;
 
 use crate::{
     database::traits::DatabaseResource,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
 
-#[derive(Debug, Serialize, Deserialize, GraphQLObject)]
+#[derive(Debug, Serialize, Deserialize, GraphQLObject, Clone)]
 pub struct Session {
     pub id: String,
     pub session_token: String,
@@ -41,14 +41,14 @@ pub struct Session {
 
 impl DatabaseResource for Session {
     fn from_row(row: &PgRow) -> Result<Self, Error> {
-        let created_at = OffsetDateTime::parse(row.get("created_at"), &Iso8601::DEFAULT).ok();
-        let updated_at = OffsetDateTime::parse(row.get("updated_at"), &Iso8601::DEFAULT).ok();
+        let created_at = row.get("created_at");
+        let updated_at = row.get("updated_at");
         let archived_at = match row.get("archived_at") {
-            Some(archived_at) => OffsetDateTime::parse(archived_at, &Iso8601::DEFAULT).ok(),
+            Some(archived_at) => archived_at,
             None => None,
         };
         let expires_at = match row.get("expires_at") {
-            Some(expires_at) => OffsetDateTime::parse(expires_at, &Iso8601::DEFAULT).ok(),
+            Some(expires_at) => expires_at,
             None => None,
         };
 
@@ -85,5 +85,11 @@ impl DatabaseResource for Session {
 
     fn is_verifiable() -> bool {
         false
+    }
+}
+
+impl crate::utils::sessions::Session for Session {
+    fn expired(&self) -> bool {
+        self.expires_at.is_some() && self.expires_at.unwrap() < OffsetDateTime::now_utc()
     }
 }

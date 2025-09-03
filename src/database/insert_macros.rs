@@ -68,21 +68,15 @@ macro_rules! insert_resource {
         };
         use crate::utils::strings::camel_to_snake_case;
         use pluralizer::pluralize;
-        use time::{Duration, OffsetDateTime, format_description::well_known::Iso8601};
+        use time::{Duration, OffsetDateTime};
         use uuid::Uuid;
 
         let input_params: Vec<(&str, DatabaseValue)> = $params;
         async {
             let id = Uuid::new_v4().to_string();
-            let created_at = OffsetDateTime::now_utc()
-                .format(&Iso8601::DEFAULT)
-                .unwrap()
-                .to_string();
+            let created_at = OffsetDateTime::now_utc();
             let updated_at = created_at.clone();
-            let expires_at = (OffsetDateTime::now_utc() + Duration::days(30))
-                .format(&Iso8601::DEFAULT)
-                .unwrap()
-                .to_string();
+            let expires_at = (OffsetDateTime::now_utc() + Duration::days(30));
 
             let resource_name = pluralize(
                 camel_to_snake_case(stringify!($resource).to_string()).as_str(),
@@ -97,7 +91,7 @@ macro_rules! insert_resource {
             }
 
             if <$resource as DatabaseResource>::has_id() {
-                params.push(("id".to_string(), DatabaseValue::String(id.clone())));
+                params.push(("id".to_string(), id.clone().into()));
             }
 
             if <$resource as DatabaseResource>::is_creatable() {
@@ -107,12 +101,12 @@ macro_rules! insert_resource {
                 {
                     params[idx] = (
                         "created_at".to_string(),
-                        DatabaseValue::DateTime(created_at.clone()),
+                        DatabaseValue::DateTime(created_at.clone().to_string()),
                     );
                 } else {
                     params.push((
                         "created_at".to_string(),
-                        DatabaseValue::DateTime(created_at.clone()),
+                        DatabaseValue::DateTime(created_at.clone().to_string()),
                     ));
                 }
             }
@@ -124,12 +118,12 @@ macro_rules! insert_resource {
                 {
                     params[idx] = (
                         "updated_at".to_string(),
-                        DatabaseValue::DateTime(updated_at.clone()),
+                        DatabaseValue::DateTime(updated_at.clone().to_string()),
                     );
                 } else {
                     params.push((
                         "updated_at".to_string(),
-                        DatabaseValue::DateTime(updated_at.clone()),
+                        DatabaseValue::DateTime(updated_at.clone().to_string()),
                     ));
                 }
             }
@@ -139,9 +133,15 @@ macro_rules! insert_resource {
                     .iter()
                     .position(|(field, _)| field.contains("expires_at"))
                 {
-                    params[idx] = ("expires_at".to_string(), expires_at.into());
+                    params[idx] = (
+                        "expires_at".to_string(),
+                        DatabaseValue::DateTime(expires_at.clone().to_string()),
+                    );
                 } else {
-                    params.push(("expires_at".to_string(), expires_at.into()));
+                    params.push((
+                        "expires_at".to_string(),
+                        DatabaseValue::DateTime(expires_at.clone().to_string()),
+                    ));
                 }
             }
 
@@ -171,7 +171,7 @@ macro_rules! insert_resource {
                         query.push_str(&format!("Cast(${} AS TEXT)", i + 1));
                     }
                     DatabaseValue::DateTime(_) => {
-                        query.push_str(&format!("CAST(${} AS VARCHAR)", i + 1));
+                        query.push_str(&format!("CAST(${} AS TIMESTAMP WITHOUT TIME ZONE)", i + 1));
                     }
                     DatabaseValue::Int(_) => {
                         query.push_str(&format!("CAST(${} AS INTEGER)", i + 1));
