@@ -8,7 +8,7 @@ use crate::{
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
 
-#[derive(Debug, Serialize, Deserialize, GraphQLObject)]
+#[derive(Debug, Serialize, Deserialize, GraphQLObject, Clone)]
 pub struct MnstrUserItem {
     pub id: String,
     pub mnstr_id: String,

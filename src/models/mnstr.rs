@@ -8,11 +8,18 @@ use crate::{
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
 
-#[derive(Debug, Serialize, Deserialize, GraphQLObject)]
+#[derive(Debug, Serialize, Deserialize, GraphQLObject, Clone)]
 pub struct Mnstr {
     pub id: String,
+    pub user_id: String,
+
+    #[graphql(name = "name")]
     pub mnstr_name: String,
+
+    #[graphql(name = "description")]
     pub mnstr_description: String,
+
+    #[graphql(name = "qrCode")]
     pub mnstr_qr_code: String,
 
     #[serde(
@@ -47,6 +54,13 @@ pub struct Mnstr {
     pub max_intelligence: i32,
     pub current_magic: i32,
     pub max_magic: i32,
+    // Relationships
+}
+
+impl Mnstr {
+    pub async fn get_relationships(&mut self) -> Option<Error> {
+        None
+    }
 }
 
 impl DatabaseResource for Mnstr {
@@ -60,6 +74,7 @@ impl DatabaseResource for Mnstr {
 
         Ok(Mnstr {
             id: row.get("id"),
+            user_id: row.get("user_id"),
             mnstr_name: row.get("mnstr_name"),
             mnstr_description: row.get("mnstr_description"),
             mnstr_qr_code: row.get("mnstr_qr_code"),

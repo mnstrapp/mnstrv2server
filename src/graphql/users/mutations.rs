@@ -30,11 +30,20 @@ pub async fn register(
         ("qr_code", qr_code.into()),
     ];
 
-    match insert_resource!(User, params).await {
-        Ok(user) => Ok(user),
+    let mut user = match insert_resource!(User, params).await {
+        Ok(user) => user,
         Err(e) => {
             println!("Failed to register user: {:?}", e);
-            Err(FieldError::from("Failed to register user"))
+            return Err(FieldError::from("Failed to register user"));
         }
+    };
+
+    if let Some(error) = user.create_relationships().await {
+        println!("Failed to create user relationships: {:?}", error);
+        return Err(FieldError::from("Failed to create user relationships"));
     }
+
+    user.get_relationships().await;
+
+    Ok(user)
 }

@@ -83,6 +83,7 @@ macro_rules! insert_resource {
                 2,
                 false,
             );
+            println!("resource_name: {:?}", resource_name);
             let pool = get_connection().await;
 
             let mut params: Vec<(String, DatabaseValue)> = Vec::new();

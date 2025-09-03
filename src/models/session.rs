@@ -5,6 +5,8 @@ use time::OffsetDateTime;
 
 use crate::{
     database::traits::DatabaseResource,
+    find_one_resource_where_fields,
+    models::user::User,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
 
@@ -37,6 +39,28 @@ pub struct Session {
         deserialize_with = "deserialize_offset_date_time"
     )]
     pub expires_at: Option<OffsetDateTime>,
+
+    // Relationships
+    pub user: Option<User>,
+}
+
+impl Session {
+    pub async fn get_relationships(&mut self) -> Option<Error> {
+        self.get_user().await?;
+        None
+    }
+
+    pub async fn get_user(&mut self) -> Option<Error> {
+        let user =
+            match find_one_resource_where_fields!(User, vec![("id", self.user_id.clone().into())])
+                .await
+            {
+                Ok(user) => user,
+                Err(e) => return Some(e),
+            };
+        self.user = Some(user);
+        None
+    }
 }
 
 impl DatabaseResource for Session {
@@ -60,6 +84,7 @@ impl DatabaseResource for Session {
             updated_at,
             archived_at,
             expires_at,
+            user: None,
         })
     }
 
