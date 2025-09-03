@@ -9,10 +9,12 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize, GraphQLObject)]
-pub struct Session {
+pub struct Item {
     pub id: String,
-    pub session_token: String,
-    pub user_id: String,
+    pub item_name: String,
+    pub item_description: String,
+    pub item_price: i32,
+    pub item_image: String,
 
     #[serde(
         serialize_with = "serialize_offset_date_time",
@@ -31,15 +33,9 @@ pub struct Session {
         deserialize_with = "deserialize_offset_date_time"
     )]
     pub archived_at: Option<OffsetDateTime>,
-
-    #[serde(
-        serialize_with = "serialize_offset_date_time",
-        deserialize_with = "deserialize_offset_date_time"
-    )]
-    pub expires_at: Option<OffsetDateTime>,
 }
 
-impl DatabaseResource for Session {
+impl DatabaseResource for Item {
     fn from_row(row: &PgRow) -> Result<Self, Error> {
         let created_at = OffsetDateTime::parse(row.get("created_at"), &Iso8601::DEFAULT).ok();
         let updated_at = OffsetDateTime::parse(row.get("updated_at"), &Iso8601::DEFAULT).ok();
@@ -47,42 +43,33 @@ impl DatabaseResource for Session {
             Some(archived_at) => OffsetDateTime::parse(archived_at, &Iso8601::DEFAULT).ok(),
             None => None,
         };
-        let expires_at = match row.get("expires_at") {
-            Some(expires_at) => OffsetDateTime::parse(expires_at, &Iso8601::DEFAULT).ok(),
-            None => None,
-        };
 
-        Ok(Session {
+        Ok(Item {
             id: row.get("id"),
-            session_token: row.get("session_token"),
-            user_id: row.get("user_id"),
+            item_name: row.get("item_name"),
+            item_description: row.get("item_description"),
+            item_price: row.get("item_price"),
+            item_image: row.get("item_image"),
             created_at,
             updated_at,
             archived_at,
-            expires_at,
         })
     }
-
     fn has_id() -> bool {
         true
     }
-
     fn is_archivable() -> bool {
         true
     }
-
     fn is_updatable() -> bool {
         true
     }
-
     fn is_creatable() -> bool {
         true
     }
-
     fn is_expirable() -> bool {
-        true
+        false
     }
-
     fn is_verifiable() -> bool {
         false
     }

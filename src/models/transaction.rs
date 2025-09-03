@@ -9,10 +9,14 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize, GraphQLObject)]
-pub struct Session {
+pub struct Transaction {
     pub id: String,
-    pub session_token: String,
-    pub user_id: String,
+    pub wallet_id: String,
+    pub transaction_type: String,
+    pub transaction_amount: i32,
+    pub transaction_status: String,
+    pub transaction_data: Option<String>,
+    pub error_message: Option<String>,
 
     #[serde(
         serialize_with = "serialize_offset_date_time",
@@ -25,64 +29,41 @@ pub struct Session {
         deserialize_with = "deserialize_offset_date_time"
     )]
     pub updated_at: Option<OffsetDateTime>,
-
-    #[serde(
-        serialize_with = "serialize_offset_date_time",
-        deserialize_with = "deserialize_offset_date_time"
-    )]
-    pub archived_at: Option<OffsetDateTime>,
-
-    #[serde(
-        serialize_with = "serialize_offset_date_time",
-        deserialize_with = "deserialize_offset_date_time"
-    )]
-    pub expires_at: Option<OffsetDateTime>,
 }
 
-impl DatabaseResource for Session {
+impl DatabaseResource for Transaction {
     fn from_row(row: &PgRow) -> Result<Self, Error> {
         let created_at = OffsetDateTime::parse(row.get("created_at"), &Iso8601::DEFAULT).ok();
         let updated_at = OffsetDateTime::parse(row.get("updated_at"), &Iso8601::DEFAULT).ok();
-        let archived_at = match row.get("archived_at") {
-            Some(archived_at) => OffsetDateTime::parse(archived_at, &Iso8601::DEFAULT).ok(),
-            None => None,
-        };
-        let expires_at = match row.get("expires_at") {
-            Some(expires_at) => OffsetDateTime::parse(expires_at, &Iso8601::DEFAULT).ok(),
-            None => None,
-        };
 
-        Ok(Session {
+        Ok(Transaction {
             id: row.get("id"),
-            session_token: row.get("session_token"),
-            user_id: row.get("user_id"),
+            wallet_id: row.get("wallet_id"),
+            transaction_type: row.get("transaction_type"),
+            transaction_amount: row.get("transaction_amount"),
+            transaction_status: row.get("transaction_status"),
+            transaction_data: row.get("transaction_data"),
+
+            error_message: row.get("error_message"),
             created_at,
             updated_at,
-            archived_at,
-            expires_at,
         })
     }
-
     fn has_id() -> bool {
         true
     }
-
     fn is_archivable() -> bool {
-        true
+        false
     }
-
     fn is_updatable() -> bool {
         true
     }
-
     fn is_creatable() -> bool {
         true
     }
-
     fn is_expirable() -> bool {
-        true
+        false
     }
-
     fn is_verifiable() -> bool {
         false
     }
