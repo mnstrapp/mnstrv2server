@@ -211,11 +211,9 @@ impl User {
     }
 
     pub async fn create_relationships(&mut self) -> Option<anyhow::Error> {
-        println!("Creating wallet for user: {:?}", self.id);
         if let Some(error) = self.create_wallet().await {
             return Some(error.into());
         }
-        println!("Creating mnstr for user: {:?}", self.id);
         if let Some(error) = self.create_mnstr().await {
             return Some(error.into());
         }

@@ -1,6 +1,6 @@
 use juniper::FieldError;
 
-use crate::{insert_resource, models::user::User, utils::passwords::hash_password};
+use crate::models::user::User;
 
 pub struct UserMutationType;
 
