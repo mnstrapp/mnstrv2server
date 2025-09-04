@@ -1,13 +1,19 @@
+use anyhow::anyhow;
 use juniper::GraphQLObject;
 use serde::{Deserialize, Serialize};
-use sqlx::{Error, Row, postgres::PgRow};
+use sqlx::{Row, postgres::PgRow};
 use time::OffsetDateTime;
 
 use crate::{
-    database::traits::DatabaseResource,
-    find_all_resources_where_fields, find_one_resource_where_fields, insert_resource,
+    database::{traits::DatabaseResource, values::DatabaseValue},
+    delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
+    insert_resource,
     models::{mnstr::Mnstr, wallet::Wallet},
-    utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
+    update_resource,
+    utils::{
+        passwords::hash_password,
+        time::{deserialize_offset_date_time, serialize_offset_date_time},
+    },
 };
 
 #[derive(Debug, Serialize, Deserialize, GraphQLObject, Clone)]
@@ -42,17 +48,141 @@ pub struct User {
 }
 
 impl User {
-    pub async fn get_relationships(&mut self) -> Option<Error> {
-        if let Some(error) = self.get_wallet().await {
+    pub fn new(email: String, password: String, display_name: String, qr_code: String) -> Self {
+        let password_hash = hash_password(&password);
+        Self {
+            id: "".to_string(),
+            email,
+            password_hash,
+            display_name,
+            qr_code,
+            created_at: None,
+            updated_at: None,
+            archived_at: None,
+            wallet: None,
+            mnstrs: None,
+        }
+    }
+
+    pub async fn create(&mut self) -> Option<anyhow::Error> {
+        let mut user = match insert_resource!(
+            User,
+            vec![
+                ("email", self.email.clone().into()),
+                ("password_hash", self.password_hash.clone().into()),
+                ("display_name", self.display_name.clone().into()),
+                ("qr_code", self.qr_code.clone().into()),
+            ]
+        )
+        .await
+        {
+            Ok(user) => user,
+            Err(e) => return Some(e.into()),
+        };
+
+        if let Some(error) = user.create_relationships().await {
             return Some(error);
         }
-        if let Some(error) = self.get_mnstrs().await {
+
+        *self = user;
+        None
+    }
+
+    pub async fn update(&mut self) -> Option<anyhow::Error> {
+        let mut user = match update_resource!(
+            User,
+            self.id.clone(),
+            vec![("display_name", self.display_name.clone().into()),]
+        )
+        .await
+        {
+            Ok(user) => user,
+            Err(e) => return Some(e.into()),
+        };
+
+        if let Some(error) = user.create_relationships().await {
             return Some(error);
+        }
+
+        *self = user;
+        None
+    }
+
+    pub async fn delete(&mut self) -> Option<anyhow::Error> {
+        match delete_resource_where_fields!(User, vec![("id", self.id.clone().into())]).await {
+            Ok(_) => (),
+            Err(e) => return Some(e.into()),
+        };
+        let user = match Self::find_one(self.id.clone()).await {
+            Ok(user) => user,
+            Err(e) => return Some(e.into()),
+        };
+        *self = user;
+        None
+    }
+
+    pub async fn find_one(id: String) -> Result<Self, anyhow::Error> {
+        let mut user =
+            match find_one_resource_where_fields!(User, vec![("id", id.clone().into())]).await {
+                Ok(user) => user,
+                Err(e) => return Err(e.into()),
+            };
+        user.get_relationships()
+            .await
+            .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        Ok(user)
+    }
+
+    pub async fn find_one_by(params: Vec<(&str, DatabaseValue)>) -> Result<Self, anyhow::Error> {
+        let mut user = match find_one_resource_where_fields!(User, params).await {
+            Ok(user) => user,
+            Err(e) => return Err(e.into()),
+        };
+        user.get_relationships()
+            .await
+            .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        Ok(user)
+    }
+
+    pub async fn find_all() -> Result<Vec<Self>, anyhow::Error> {
+        let mut users = match find_all_resources_where_fields!(User, vec![]).await {
+            Ok(users) => users,
+            Err(e) => return Err(e.into()),
+        };
+        for user in users.iter_mut() {
+            user.get_relationships()
+                .await
+                .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        }
+        Ok(users)
+    }
+
+    pub async fn find_all_by(
+        params: Vec<(&str, DatabaseValue)>,
+    ) -> Result<Vec<Self>, anyhow::Error> {
+        let mut users = match find_all_resources_where_fields!(User, params).await {
+            Ok(users) => users,
+            Err(e) => return Err(e.into()),
+        };
+        for user in users.iter_mut() {
+            user.get_relationships()
+                .await
+                .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        }
+        Ok(users)
+    }
+
+    pub async fn get_relationships(&mut self) -> Option<anyhow::Error> {
+        if let Some(error) = self.get_wallet().await {
+            return Some(error.into());
+        }
+        if let Some(error) = self.get_mnstrs().await {
+            return Some(error.into());
         }
         None
     }
 
-    pub async fn get_wallet(&mut self) -> Option<Error> {
+    pub async fn get_wallet(&mut self) -> Option<anyhow::Error> {
         let wallet = match find_one_resource_where_fields!(
             Wallet,
             vec![("user_id", self.id.clone().into())]
@@ -60,13 +190,13 @@ impl User {
         .await
         {
             Ok(wallet) => wallet,
-            Err(e) => return Some(e),
+            Err(e) => return Some(e.into()),
         };
         self.wallet = Some(wallet);
         None
     }
 
-    pub async fn get_mnstrs(&mut self) -> Option<Error> {
+    pub async fn get_mnstrs(&mut self) -> Option<anyhow::Error> {
         let mnstrs = match find_all_resources_where_fields!(
             Mnstr,
             vec![("user_id", self.id.clone().into())]
@@ -74,81 +204,72 @@ impl User {
         .await
         {
             Ok(mnstrs) => mnstrs,
-            Err(e) => return Some(e),
+            Err(e) => return Some(e.into()),
         };
         self.mnstrs = Some(mnstrs);
         None
     }
 
-    pub async fn create_relationships(&mut self) -> Option<Error> {
+    pub async fn create_relationships(&mut self) -> Option<anyhow::Error> {
         println!("Creating wallet for user: {:?}", self.id);
         if let Some(error) = self.create_wallet().await {
-            return Some(error);
+            return Some(error.into());
         }
         println!("Creating mnstr for user: {:?}", self.id);
         if let Some(error) = self.create_mnstr().await {
-            return Some(error);
+            return Some(error.into());
         }
         None
     }
 
-    pub async fn create_wallet(&mut self) -> Option<Error> {
-        let params = vec![("user_id", self.id.clone().into())];
-        let wallet = match find_one_resource_where_fields!(Wallet, params).await {
-            Ok(wallet) => Some(wallet),
-            Err(_) => None,
-        };
-        if wallet.is_some() {
-            self.wallet = wallet;
+    pub async fn create_wallet(&mut self) -> Option<anyhow::Error> {
+        let found_wallet =
+            match Wallet::find_one_by(vec![("user_id", self.id.clone().into())]).await {
+                Ok(wallet) => Some(wallet),
+                Err(_) => None,
+            };
+        if let Some(mut found_wallet) = found_wallet {
+            if let Some(error) = found_wallet.get_relationships().await {
+                return Some(error.into());
+            }
+            self.wallet = Some(found_wallet);
             return None;
         }
 
-        let params = vec![("user_id", self.id.clone().into())];
-        let wallet = match insert_resource!(Wallet, params).await {
-            Ok(wallet) => wallet,
-            Err(e) => {
-                println!("Failed to create wallet: {:?}", e);
-                return Some(e);
-            }
-        };
+        let mut wallet = Wallet::new(self.id.clone());
+        if let Some(error) = wallet.create().await {
+            return Some(error.into());
+        }
         self.wallet = Some(wallet);
         None
     }
 
-    pub async fn create_mnstr(&mut self) -> Option<Error> {
-        let params = vec![
-            ("user_id", self.id.clone().into()),
-            ("mnstr_qr_code", self.qr_code.clone().into()),
-        ];
-        let mnstr = match find_one_resource_where_fields!(Mnstr, params).await {
+    pub async fn create_mnstr(&mut self) -> Option<anyhow::Error> {
+        let found_mnstr = match Mnstr::find_one_by(vec![("user_id", self.id.clone().into())]).await
+        {
             Ok(mnstr) => Some(mnstr),
             Err(_) => None,
         };
-        if mnstr.is_some() {
-            let mut mnstr = mnstr.clone().unwrap();
-            mnstr.get_relationships().await?;
-            self.mnstrs = Some(vec![mnstr]);
+        if let Some(mut found_mnstr) = found_mnstr {
+            if let Some(error) = found_mnstr.get_relationships().await {
+                return Some(error.into());
+            }
+            self.mnstrs = Some(vec![found_mnstr]);
             return None;
         }
 
-        let params = vec![
-            ("user_id", self.id.clone().into()),
-            ("mnstr_name", self.display_name.clone().into()),
-            (
-                "mnstr_description",
-                format!("{}'s Mnstr", self.display_name.clone()).into(),
-            ),
-            ("mnstr_qr_code", self.qr_code.clone().into()),
-        ];
-        let mut mnstr = match insert_resource!(Mnstr, params).await {
-            Ok(mnstr) => mnstr,
-            Err(e) => {
-                println!("Failed to create mnstr: {:?}", e);
-                return Some(e);
-            }
-        };
-
-        mnstr.get_relationships().await?;
+        let mut mnstr = Mnstr::new(
+            self.id.clone(),
+            self.display_name.clone(),
+            format!("{}'s Mnstr", self.display_name.clone()),
+            self.qr_code.clone(),
+        );
+        if let Some(error) = mnstr.create().await {
+            return Some(error.into());
+        }
+        if let Some(error) = mnstr.get_relationships().await {
+            return Some(error.into());
+        }
 
         self.mnstrs = Some(vec![mnstr]);
         None
@@ -156,7 +277,7 @@ impl User {
 }
 
 impl DatabaseResource for User {
-    fn from_row(row: &PgRow) -> Result<Self, Error> {
+    fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         let created_at = row.get("created_at");
         let updated_at = row.get("updated_at");
         let archived_at = match row.get("archived_at") {

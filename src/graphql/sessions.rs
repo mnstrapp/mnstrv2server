@@ -37,31 +37,25 @@ pub async fn create_session(email: String, password: String) -> Result<Session, 
         }
     };
 
-    let token = Uuid::new_v4().to_string();
-    let params = vec![("user_id", user.id.into()), ("session_token", token.into())];
-    let session = match insert_resource!(Session, params).await {
-        Ok(session) => session,
-        Err(e) => {
-            println!("Failed to create session: {:?}", e);
-            return Err(FieldError::from("Failed to create session"));
-        }
+    let mut session = Session::new(user.id.clone());
+    if let Some(error) = session.create().await {
+        println!("Failed to create session: {:?}", error);
+        return Err(FieldError::from("Failed to create session"));
     };
 
     Ok(session)
 }
 
 pub async fn delete_session(ctx: &Ctx) -> Result<bool, FieldError> {
-    if validate_session(ctx.session.clone()).is_err() {
+    if let None = ctx.session {
         return Err(FieldError::from("Invalid session"));
     }
+    let mut session = ctx.session.as_ref().unwrap().clone();
 
-    let session = ctx.session.as_ref().unwrap();
-
-    match delete_resource_where_fields!(Session, vec![("id", session.id.clone().into())]).await {
-        Ok(_) => Ok(true),
-        Err(e) => {
-            println!("Failed to delete session: {:?}", e);
-            Err(FieldError::from("Failed to delete session"))
-        }
+    if let Some(error) = session.delete().await {
+        println!("Failed to delete session: {:?}", error);
+        return Err(FieldError::from("Failed to delete session"));
     }
+
+    Ok(true)
 }

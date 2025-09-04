@@ -4,7 +4,8 @@ use sqlx::{Error, Row, postgres::PgRow};
 use time::OffsetDateTime;
 
 use crate::{
-    database::traits::DatabaseResource,
+    database::{traits::DatabaseResource, values::DatabaseValue},
+    find_all_resources_where_fields, find_one_resource_where_fields, insert_resource,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
 
@@ -58,6 +59,112 @@ pub struct Mnstr {
 }
 
 impl Mnstr {
+    pub fn new(
+        user_id: String,
+        mnstr_name: String,
+        mnstr_description: String,
+        mnstr_qr_code: String,
+    ) -> Self {
+        Self {
+            id: "".to_string(),
+            user_id,
+            mnstr_name,
+            mnstr_description,
+            mnstr_qr_code,
+            created_at: None,
+            updated_at: None,
+            archived_at: None,
+            current_level: 0,
+            current_experience: 0,
+            current_health: 0,
+            max_health: 0,
+            current_attack: 0,
+            max_attack: 0,
+            current_defense: 0,
+            max_defense: 0,
+            current_speed: 0,
+            max_speed: 0,
+            current_intelligence: 0,
+            max_intelligence: 0,
+            current_magic: 0,
+            max_magic: 0,
+        }
+    }
+
+    pub async fn create(&mut self) -> Option<anyhow::Error> {
+        let mnstr = match insert_resource!(
+            Mnstr,
+            vec![
+                ("user_id", self.user_id.clone().into()),
+                ("mnstr_name", self.mnstr_name.clone().into()),
+                ("mnstr_description", self.mnstr_description.clone().into()),
+                ("mnstr_qr_code", self.mnstr_qr_code.clone().into())
+            ]
+        )
+        .await
+        {
+            Ok(mnstr) => mnstr,
+            Err(e) => return Some(e.into()),
+        };
+        *self = mnstr;
+        None
+    }
+
+    pub async fn find_one(id: String) -> Result<Self, anyhow::Error> {
+        let mut mnstr =
+            match find_one_resource_where_fields!(Mnstr, vec![("id", id.clone().into())]).await {
+                Ok(mnstr) => mnstr,
+                Err(e) => return Err(e.into()),
+            };
+        mnstr
+            .get_relationships()
+            .await
+            .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        Ok(mnstr)
+    }
+
+    pub async fn find_one_by(params: Vec<(&str, DatabaseValue)>) -> Result<Self, anyhow::Error> {
+        let mut mnstr = match find_one_resource_where_fields!(Mnstr, params).await {
+            Ok(mnstr) => mnstr,
+            Err(e) => return Err(e.into()),
+        };
+        mnstr
+            .get_relationships()
+            .await
+            .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        Ok(mnstr)
+    }
+
+    pub async fn find_all() -> Result<Vec<Self>, anyhow::Error> {
+        let mut mnstrs = match find_all_resources_where_fields!(Mnstr, vec![]).await {
+            Ok(mnstrs) => mnstrs,
+            Err(e) => return Err(e.into()),
+        };
+        for mnstr in mnstrs.iter_mut() {
+            mnstr
+                .get_relationships()
+                .await
+                .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        }
+        Ok(mnstrs)
+    }
+
+    pub async fn find_all_by(
+        params: Vec<(&str, DatabaseValue)>,
+    ) -> Result<Vec<Self>, anyhow::Error> {
+        let mut mnstrs = match find_all_resources_where_fields!(Mnstr, params).await {
+            Ok(mnstrs) => mnstrs,
+            Err(e) => return Err(e.into()),
+        };
+        for mnstr in mnstrs.iter_mut() {
+            mnstr
+                .get_relationships()
+                .await
+                .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        }
+        Ok(mnstrs)
+    }
+
     pub async fn get_relationships(&mut self) -> Option<Error> {
         None
     }

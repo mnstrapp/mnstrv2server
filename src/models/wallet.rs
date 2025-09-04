@@ -4,7 +4,8 @@ use sqlx::{Error, Row, postgres::PgRow};
 use time::OffsetDateTime;
 
 use crate::{
-    database::traits::DatabaseResource,
+    database::{traits::DatabaseResource, values::DatabaseValue},
+    find_all_resources_where_fields, find_one_resource_where_fields, insert_resource,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
 
@@ -30,6 +31,87 @@ pub struct Wallet {
         deserialize_with = "deserialize_offset_date_time"
     )]
     pub archived_at: Option<OffsetDateTime>,
+}
+
+impl Wallet {
+    pub fn new(user_id: String) -> Self {
+        Self {
+            id: "".to_string(),
+            user_id,
+            created_at: None,
+            updated_at: None,
+            archived_at: None,
+        }
+    }
+
+    pub async fn create(&mut self) -> Option<anyhow::Error> {
+        let mut wallet =
+            match insert_resource!(Wallet, vec![("user_id", self.user_id.clone().into())]).await {
+                Ok(wallet) => wallet,
+                Err(e) => return Some(e.into()),
+            };
+        *self = wallet;
+        None
+    }
+
+    pub async fn find_one(id: String) -> Result<Self, anyhow::Error> {
+        let mut wallet =
+            match find_one_resource_where_fields!(Wallet, vec![("id", id.clone().into())]).await {
+                Ok(wallet) => wallet,
+                Err(e) => return Err(e.into()),
+            };
+        wallet
+            .get_relationships()
+            .await
+            .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        Ok(wallet)
+    }
+
+    pub async fn find_one_by(params: Vec<(&str, DatabaseValue)>) -> Result<Self, anyhow::Error> {
+        let mut wallet = match find_one_resource_where_fields!(Wallet, params).await {
+            Ok(wallet) => wallet,
+            Err(e) => return Err(e.into()),
+        };
+        wallet
+            .get_relationships()
+            .await
+            .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        Ok(wallet)
+    }
+
+    pub async fn find_all() -> Result<Vec<Self>, anyhow::Error> {
+        let mut wallets = match find_all_resources_where_fields!(Wallet, vec![]).await {
+            Ok(wallets) => wallets,
+            Err(e) => return Err(e.into()),
+        };
+        for wallet in wallets.iter_mut() {
+            wallet
+                .get_relationships()
+                .await
+                .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        }
+        Ok(wallets)
+    }
+
+    pub async fn find_all_by(
+        params: Vec<(&str, DatabaseValue)>,
+    ) -> Result<Vec<Self>, anyhow::Error> {
+        let mut wallets = match find_all_resources_where_fields!(Wallet, params).await {
+            Ok(wallets) => wallets,
+            Err(e) => return Err(e.into()),
+        };
+        for wallet in wallets.iter_mut() {
+            wallet
+                .get_relationships()
+                .await
+                .ok_or(anyhow::anyhow!("Failed to get relationships"))?;
+        }
+        Ok(wallets)
+    }
+
+    pub async fn get_relationships(&mut self) -> Option<anyhow::Error> {
+        None
+    }
 }
 
 impl DatabaseResource for Wallet {

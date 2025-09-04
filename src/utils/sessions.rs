@@ -1,17 +1,12 @@
 pub trait Session {
     fn expired(&self) -> bool;
+    async fn update_expired(&mut self) -> Option<anyhow::Error>;
 }
 
-pub fn validate_session<T: Session>(session: Option<T>) -> Result<(), String> {
-    if session.is_none() {
-        return Err("Session not found".to_string());
-    }
-
-    let session = session.unwrap();
-
+pub async fn validate_session<T: Session>(session: &mut T) -> Option<anyhow::Error> {
     if session.expired() {
-        return Err("Session expired".to_string());
+        return Some(anyhow::anyhow!("Session expired"));
     }
 
-    Ok(())
+    session.update_expired().await
 }

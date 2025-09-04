@@ -4,10 +4,9 @@ use juniper_rocket::{GraphQLRequest, GraphQLResponse};
 use rocket::{Route, get, post, response::content::RawHtml};
 
 use crate::{
-    find_one_resource_where_fields,
     graphql::{sessions::SessionMutationType, users::mutations::UserMutationType},
     models::session::Session,
-    utils::token::RawToken,
+    utils::{sessions::validate_session, token::RawToken},
 };
 
 pub mod clients;
@@ -84,11 +83,12 @@ pub async fn graphql(request: GraphQLRequest, token: RawToken) -> GraphQLRespons
 }
 
 async fn verify_session_token(token: RawToken) -> Result<Session, FieldError> {
-    let session_params = vec![("session_token", token.value.into())];
-    let session = match find_one_resource_where_fields!(Session, session_params).await {
+    let mut session = match Session::find_one_by_token(token.value).await {
         Ok(session) => session,
         Err(e) => return Err(e.into()),
     };
-
+    if validate_session(&mut session).await.is_some() {
+        return Err(FieldError::from("Invalid session"));
+    }
     Ok(session)
 }
