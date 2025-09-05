@@ -25,11 +25,14 @@ pub async fn register(
     let mut user = User::new(email, password, display_name, qr_code);
 
     if let Some(error) = user.create().await {
-        println!("Failed to register user: {:?}", error);
+        println!("[register] Failed to register user: {:?}", error);
         return Err(FieldError::from("Failed to register user"));
     }
 
-    user.get_relationships().await;
+    if let Some(error) = user.get_relationships().await {
+        println!("[register] Failed to get relationships: {:?}", error);
+        return Err(FieldError::from("Failed to get relationships"));
+    }
 
     Ok(user)
 }

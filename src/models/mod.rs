@@ -1,4 +1,5 @@
 pub mod effect;
+pub mod generated;
 pub mod item;
 pub mod item_effect;
 pub mod mnstr;
