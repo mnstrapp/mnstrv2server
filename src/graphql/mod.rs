@@ -9,8 +9,7 @@ use crate::{
     utils::{sessions::validate_session, token::RawToken},
 };
 
-pub mod clients;
-pub mod internal;
+pub mod mnstrs;
 pub mod sessions;
 pub mod users;
 

@@ -386,6 +386,8 @@ impl User {
         if self.experience_level < XP_FOR_LEVEL.len() as i32 - 1 {
             let xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
             let xp_overage = xp - xp_to_next_level;
+            println!("[User::update_xp] XP to next level: {:?}", xp_to_next_level);
+            println!("[User::update_xp] XP overage: {:?}", xp_overage);
             self.experience_level += 1;
             if xp_overage > 0 {
                 self.experience_points = xp_overage;
@@ -395,7 +397,7 @@ impl User {
         } else {
             self.experience_points += xp;
         }
-        self.experience_to_next_level = XP_FOR_LEVEL[self.experience_level as usize];
+        self.experience_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
         if let Some(error) = self.update().await {
             println!("[User::update_xp] Failed to update user xp: {:?}", error);
             return Some(error.into());
