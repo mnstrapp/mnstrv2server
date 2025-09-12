@@ -8,5 +8,5 @@ ENV SQLX_OFFLINE=true
 
 RUN cargo install --path .
 
-EXPOSE 8000
+EXPOSE 8080
 ENTRYPOINT ["mnstrv2server"]
