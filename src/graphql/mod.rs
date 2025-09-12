@@ -4,7 +4,10 @@ use juniper_rocket::{GraphQLRequest, GraphQLResponse};
 use rocket::{Route, get, post, response::content::RawHtml};
 
 use crate::{
-    graphql::{sessions::SessionMutationType, users::mutations::UserMutationType},
+    graphql::{
+        sessions::{SessionMutationType, SessionQueryType},
+        users::mutations::UserMutationType,
+    },
     models::session::Session,
     utils::{sessions::validate_session, token::RawToken},
 };
@@ -29,6 +32,10 @@ pub struct Query;
 impl Query {
     async fn hello() -> &'static str {
         "Hello, world!"
+    }
+
+    async fn session() -> SessionQueryType {
+        SessionQueryType
     }
 }
 

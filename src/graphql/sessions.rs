@@ -59,3 +59,20 @@ pub async fn delete_session(ctx: &Ctx) -> Result<bool, FieldError> {
 
     Ok(true)
 }
+
+pub struct SessionQueryType;
+
+#[juniper::graphql_object]
+impl SessionQueryType {
+    async fn verify(ctx: &Ctx) -> Result<Session, FieldError> {
+        verify_session(ctx).await
+    }
+}
+
+pub async fn verify_session(ctx: &Ctx) -> Result<Session, FieldError> {
+    if let None = ctx.session {
+        return Err(FieldError::from("Invalid session"));
+    }
+    let session = ctx.session.as_ref().unwrap().clone();
+    Ok(session)
+}
