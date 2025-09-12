@@ -94,6 +94,58 @@ impl Mnstr {
             max_magic: 0,
         }
     }
+    pub fn copy_with(
+        &self,
+        mnstr_name: Option<String>,
+        mnstr_description: Option<String>,
+        mnstr_qr_code: Option<String>,
+        created_at: Option<OffsetDateTime>,
+        updated_at: Option<OffsetDateTime>,
+        archived_at: Option<OffsetDateTime>,
+        current_level: Option<i32>,
+        current_experience: Option<i32>,
+        current_health: Option<i32>,
+        max_health: Option<i32>,
+        current_attack: Option<i32>,
+        max_attack: Option<i32>,
+        current_defense: Option<i32>,
+        max_defense: Option<i32>,
+        current_speed: Option<i32>,
+        max_speed: Option<i32>,
+        current_intelligence: Option<i32>,
+        max_intelligence: Option<i32>,
+        current_magic: Option<i32>,
+        max_magic: Option<i32>,
+    ) -> Self {
+        let created_at = Some(created_at.unwrap_or(self.created_at.clone().unwrap()));
+        let updated_at = Some(updated_at.unwrap_or(self.updated_at.clone().unwrap()));
+        let archived_at = Some(archived_at.unwrap_or(self.archived_at.clone().unwrap()));
+
+        Self {
+            id: self.id.clone(),
+            user_id: self.user_id.clone(),
+            mnstr_name: mnstr_name.unwrap_or(self.mnstr_name.clone()),
+            mnstr_description: mnstr_description.unwrap_or(self.mnstr_description.clone()),
+            mnstr_qr_code: mnstr_qr_code.unwrap_or(self.mnstr_qr_code.clone()),
+            created_at: created_at,
+            updated_at: updated_at,
+            archived_at: archived_at,
+            current_level: current_level.unwrap_or(self.current_level),
+            current_experience: current_experience.unwrap_or(self.current_experience),
+            current_health: current_health.unwrap_or(self.current_health),
+            max_health: max_health.unwrap_or(self.max_health),
+            current_attack: current_attack.unwrap_or(self.current_attack),
+            max_attack: max_attack.unwrap_or(self.max_attack),
+            current_defense: current_defense.unwrap_or(self.current_defense),
+            max_defense: max_defense.unwrap_or(self.max_defense),
+            current_speed: current_speed.unwrap_or(self.current_speed),
+            max_speed: max_speed.unwrap_or(self.max_speed),
+            current_intelligence: current_intelligence.unwrap_or(self.current_intelligence),
+            max_intelligence: max_intelligence.unwrap_or(self.max_intelligence),
+            current_magic: current_magic.unwrap_or(self.current_magic),
+            max_magic: max_magic.unwrap_or(self.max_magic),
+        }
+    }
 
     pub async fn create(&mut self) -> Option<anyhow::Error> {
         let mnstr = match insert_resource!(

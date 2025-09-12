@@ -5,6 +5,7 @@ use rocket::{Route, get, post, response::content::RawHtml};
 
 use crate::{
     graphql::{
+        mnstrs::{mutations::MnstrMutationType, queries::MnstrQueryType},
         sessions::{SessionMutationType, SessionQueryType},
         users::{mutations::UserMutationType, queries::UserQueryType},
     },
@@ -37,6 +38,10 @@ impl Query {
     pub async fn users() -> UserQueryType {
         UserQueryType
     }
+
+    pub async fn mnstrs() -> MnstrQueryType {
+        MnstrQueryType
+    }
 }
 
 pub struct Mutation;
@@ -49,6 +54,10 @@ impl Mutation {
 
     pub async fn users() -> UserMutationType {
         UserMutationType
+    }
+
+    pub async fn mnstrs() -> MnstrMutationType {
+        MnstrMutationType
     }
 }
 
