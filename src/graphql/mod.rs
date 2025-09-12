@@ -6,7 +6,7 @@ use rocket::{Route, get, post, response::content::RawHtml};
 use crate::{
     graphql::{
         sessions::{SessionMutationType, SessionQueryType},
-        users::mutations::UserMutationType,
+        users::{mutations::UserMutationType, queries::UserQueryType},
     },
     models::session::Session,
     utils::{sessions::validate_session, token::RawToken},
@@ -30,12 +30,12 @@ pub struct Query;
 
 #[graphql_object(context = Ctx)]
 impl Query {
-    async fn hello() -> &'static str {
-        "Hello, world!"
-    }
-
     async fn session() -> SessionQueryType {
         SessionQueryType
+    }
+
+    pub async fn users() -> UserQueryType {
+        UserQueryType
     }
 }
 
