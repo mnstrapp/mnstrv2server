@@ -174,10 +174,9 @@ impl Mnstr {
                 return Some(e.into());
             }
         };
-        if let Some(error) = user
-            .update_xp(XP_FOR_LEVEL[user.experience_level as usize])
-            .await
-        {
+        let xp = XP_FOR_LEVEL[user.experience_level as usize];
+        println!("[Mnstr::create] XP: {:?}", xp);
+        if let Some(error) = user.update_xp(xp).await {
             println!("[Mnstr::create] Failed to update user xp: {:?}", error);
             return Some(error.into());
         }

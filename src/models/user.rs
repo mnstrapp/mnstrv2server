@@ -75,42 +75,51 @@ impl User {
     }
 
     pub async fn create(&mut self) -> Option<anyhow::Error> {
-        let mut user = match insert_resource!(
-            User,
-            vec![
-                ("email", self.email.clone().into()),
-                ("password_hash", self.password_hash.clone().into()),
-                ("display_name", self.display_name.clone().into()),
-                ("qr_code", self.qr_code.clone().into()),
-            ]
-        )
-        .await
-        {
+        println!(
+            "[User::create] Creating user: {:?}",
+            self.display_name.clone()
+        );
+        let params = vec![
+            ("email", self.email.clone().into()),
+            ("password_hash", self.password_hash.clone().into()),
+            ("display_name", self.display_name.clone().into()),
+            ("qr_code", self.qr_code.clone().into()),
+        ];
+        let mut user = match insert_resource!(User, params).await {
             Ok(user) => user,
-            Err(e) => return Some(e.into()),
+            Err(e) => {
+                println!("[User::create] Failed to create user: {:?}", e);
+                return Some(e.into());
+            }
         };
 
         if let Some(error) = user.create_relationships().await {
+            println!("[User::create] Failed to create relationships: {:?}", error);
             return Some(error);
         }
-        user.experience_to_next_level = XP_FOR_LEVEL[user.experience_level as usize + 1];
+
         *self = user;
         None
     }
 
     pub async fn update(&mut self) -> Option<anyhow::Error> {
-        let mut user = match update_resource!(
-            User,
-            self.id.clone(),
-            vec![("display_name", self.display_name.clone().into()),]
-        )
-        .await
-        {
+        println!("[User::update] Updating user: {:?}", self.id);
+
+        let params = vec![
+            ("display_name", self.display_name.clone().into()),
+            ("experience_level", self.experience_level.clone().into()),
+            ("experience_points", self.experience_points.clone().into()),
+        ];
+        let mut user = match update_resource!(User, self.id.clone(), params).await {
             Ok(user) => user,
-            Err(e) => return Some(e.into()),
+            Err(e) => {
+                println!("[User::update] Failed to update user: {:?}", e);
+                return Some(e.into());
+            }
         };
 
         if let Some(error) = user.get_relationships().await {
+            println!("[User::update] Failed to get relationships: {:?}", error);
             return Some(error);
         }
 
@@ -144,7 +153,7 @@ impl User {
             println!("[User::find_one] Failed to get relationships: {:?}", error);
             return Err(error.into());
         }
-        user.experience_to_next_level = XP_FOR_LEVEL[user.experience_level as usize + 1];
+        user.update_experience_to_next_level();
         Ok(user)
     }
 
@@ -163,7 +172,7 @@ impl User {
             );
             return Err(error.into());
         }
-        user.experience_to_next_level = XP_FOR_LEVEL[user.experience_level as usize + 1];
+        user.update_experience_to_next_level();
         Ok(user)
     }
 
@@ -176,7 +185,7 @@ impl User {
             }
         };
         for user in users.iter_mut() {
-            user.experience_to_next_level = XP_FOR_LEVEL[user.experience_level as usize + 1];
+            user.update_experience_to_next_level();
             if let Some(error) = user.get_relationships().await {
                 println!("[User::find_all] Failed to get relationships: {:?}", error);
                 return Err(error.into());
@@ -196,7 +205,7 @@ impl User {
             }
         };
         for user in users.iter_mut() {
-            user.experience_to_next_level = XP_FOR_LEVEL[user.experience_level as usize + 1];
+            user.update_experience_to_next_level();
             if let Some(error) = user.get_relationships().await {
                 println!(
                     "[User::find_all_by] Failed to get relationships: {:?}",
@@ -381,23 +390,49 @@ impl User {
         None
     }
 
+    pub fn update_experience_to_next_level(&mut self) {
+        let last_level_index = XP_FOR_LEVEL.len() as i32 - 1;
+        let mut xp_to_next_level = XP_FOR_LEVEL[last_level_index as usize];
+        if self.experience_level < last_level_index {
+            xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
+        }
+        self.experience_to_next_level = xp_to_next_level;
+    }
+
     pub async fn update_xp(&mut self, xp: i32) -> Option<anyhow::Error> {
         println!("[User::update_xp] Updating xp: {:?}", xp);
-        if self.experience_level < XP_FOR_LEVEL.len() as i32 - 1 {
-            let xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
-            let xp_overage = xp - xp_to_next_level;
-            println!("[User::update_xp] XP to next level: {:?}", xp_to_next_level);
-            println!("[User::update_xp] XP overage: {:?}", xp_overage);
-            self.experience_level += 1;
-            if xp_overage > 0 {
-                self.experience_points = xp_overage;
-            } else {
-                self.experience_points = 0;
-            }
-        } else {
-            self.experience_points += xp;
+
+        self.experience_points += xp;
+
+        let last_level_index = XP_FOR_LEVEL.len() as i32 - 1;
+        let mut xp_to_next_level = XP_FOR_LEVEL[last_level_index as usize];
+        if self.experience_level < last_level_index {
+            xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
         }
-        self.experience_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
+        let xp_overage = xp - xp_to_next_level;
+
+        if xp_overage >= 0 {
+            self.experience_level += 1;
+            self.experience_points = xp_overage;
+        }
+
+        self.experience_to_next_level = xp_to_next_level;
+
+        println!("[User::update_xp] XP to next level: {:?}", xp_to_next_level);
+        println!("[User::update_xp] XP overage: {:?}", xp_overage);
+        println!(
+            "[User::update_xp] Experience level: {:?}",
+            self.experience_level
+        );
+        println!(
+            "[User::update_xp] Experience points: {:?}",
+            self.experience_points
+        );
+        println!(
+            "[User::update_xp] Experience to next level: {:?}",
+            self.experience_to_next_level
+        );
+
         if let Some(error) = self.update().await {
             println!("[User::update_xp] Failed to update user xp: {:?}", error);
             return Some(error.into());
@@ -432,7 +467,6 @@ impl DatabaseResource for User {
         };
         let experience_level = row.get("experience_level");
         let experience_points = row.get("experience_points");
-        let experience_to_next_level = XP_FOR_LEVEL[experience_level as usize];
 
         Ok(User {
             id: row.get("id"),
@@ -442,7 +476,7 @@ impl DatabaseResource for User {
             qr_code: row.get("qr_code"),
             experience_level,
             experience_points,
-            experience_to_next_level,
+            experience_to_next_level: 0,
             coins: 0,
             created_at,
             updated_at,

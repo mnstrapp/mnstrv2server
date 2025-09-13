@@ -29,10 +29,13 @@ pub async fn register(
         return Err(FieldError::from("Failed to register user"));
     }
 
-    if let Some(error) = user.get_relationships().await {
-        println!("[register] Failed to get relationships: {:?}", error);
-        return Err(FieldError::from("Failed to get relationships"));
-    }
+    let user = match User::find_one(user.id.clone()).await {
+        Ok(user) => user,
+        Err(e) => {
+            println!("[register] Failed to get user: {:?}", e);
+            return Err(FieldError::from("Failed to get user"));
+        }
+    };
 
     Ok(user)
 }
