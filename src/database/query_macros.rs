@@ -57,6 +57,7 @@ macro_rules! find_all_resources_where_fields {
                     query.push_str(" AND ");
                 }
             }
+            query.push_str(" ORDER BY created_at DESC");
 
             let mut query = sqlx::query(&query);
             for value in values.iter() {
@@ -130,6 +131,8 @@ macro_rules! find_all_unarchived_resources_where_fields {
                 query = query.bind(value);
             }
 
+            query.push_str(" ORDER BY created_at DESC");
+
             match query.fetch_all(&pool).await {
                 Ok(rows) => rows
                     .into_iter()
@@ -193,6 +196,8 @@ macro_rules! find_all_archived_resources_where_fields {
                     query.push_str(" AND ");
                 }
             }
+
+            query.push_str(" ORDER BY created_at DESC");
 
             let mut query = sqlx::query(&query);
             for (_, value) in values.iter().enumerate() {
@@ -460,6 +465,8 @@ macro_rules! find_all_resources_where_fields_like {
                     query.push_str(" OR ");
                 }
             }
+
+            query.push_str(" ORDER BY created_at DESC");
 
             let mut query = sqlx::query(&query);
             for _ in params.iter() {
