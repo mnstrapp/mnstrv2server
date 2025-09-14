@@ -409,11 +409,17 @@ impl User {
         if self.experience_level < last_level_index {
             xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
         }
-        let xp_overage = xp - xp_to_next_level;
+        let xp_overage = xp_to_next_level - self.experience_points;
 
-        if xp_overage >= 0 {
+        let mut remaining_overage = xp_overage;
+        while remaining_overage > 0 {
+            let xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
+            if remaining_overage < xp_to_next_level {
+                break;
+            }
+            remaining_overage -= xp_to_next_level;
             self.experience_level += 1;
-            self.experience_points = xp_overage;
+            self.experience_points = remaining_overage;
         }
 
         self.experience_to_next_level = xp_to_next_level;
