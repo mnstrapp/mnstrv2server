@@ -409,16 +409,26 @@ impl User {
         if self.experience_level < last_level_index {
             xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
         }
-        let xp_overage = xp_to_next_level - self.experience_points;
+        let xp_overage = self.experience_points - xp_to_next_level;
 
         let mut remaining_overage = xp_overage;
-        while remaining_overage > 0 {
-            let xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
-            if remaining_overage < xp_to_next_level {
-                break;
-            }
+        while remaining_overage >= 0 {
+            println!(
+                "[User::update_xp] Remaining overage: {:?}",
+                remaining_overage
+            );
+            println!(
+                "[User::update_xp] Experience level: {:?}",
+                self.experience_level
+            );
+            xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
             remaining_overage -= xp_to_next_level;
             self.experience_level += 1;
+            xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
+            if remaining_overage < 0 {
+                self.experience_points = 0;
+                break;
+            }
             self.experience_points = remaining_overage;
         }
 
