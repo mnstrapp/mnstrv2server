@@ -117,9 +117,18 @@ impl Mnstr {
         current_magic: Option<i32>,
         max_magic: Option<i32>,
     ) -> Self {
-        let created_at = Some(created_at.unwrap_or(self.created_at.clone().unwrap()));
-        let updated_at = Some(updated_at.unwrap_or(self.updated_at.clone().unwrap()));
-        let archived_at = Some(archived_at.unwrap_or(self.archived_at.clone().unwrap()));
+        let created_at = match created_at {
+            Some(created_at) => Some(created_at),
+            None => None,
+        };
+        let updated_at = match updated_at {
+            Some(updated_at) => Some(updated_at),
+            None => None,
+        };
+        let archived_at = match archived_at {
+            Some(archived_at) => Some(archived_at),
+            None => None,
+        };
 
         Self {
             id: self.id.clone(),
