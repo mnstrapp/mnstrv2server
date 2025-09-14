@@ -421,15 +421,15 @@ impl User {
                 "[User::update_xp] Experience level: {:?}",
                 self.experience_level
             );
+            self.experience_points = remaining_overage;
+            self.experience_level += 1;
             xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
             remaining_overage -= xp_to_next_level;
-            self.experience_level += 1;
+
             xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
             if remaining_overage < 0 {
                 self.experience_points = 0;
-                break;
             }
-            self.experience_points = remaining_overage;
         }
 
         self.experience_to_next_level = xp_to_next_level;

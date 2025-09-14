@@ -157,17 +157,30 @@ impl Mnstr {
     }
 
     pub async fn create(&mut self) -> Option<anyhow::Error> {
-        let mnstr = match insert_resource!(
-            Mnstr,
-            vec![
-                ("user_id", self.user_id.clone().into()),
-                ("mnstr_name", self.mnstr_name.clone().into()),
-                ("mnstr_description", self.mnstr_description.clone().into()),
-                ("mnstr_qr_code", self.mnstr_qr_code.clone().into())
-            ]
-        )
-        .await
-        {
+        let params = vec![
+            ("user_id", self.user_id.clone().into()),
+            ("mnstr_name", self.mnstr_name.clone().into()),
+            ("mnstr_description", self.mnstr_description.clone().into()),
+            ("mnstr_qr_code", self.mnstr_qr_code.clone().into()),
+            ("current_level", self.current_level.clone().into()),
+            ("current_experience", self.current_experience.clone().into()),
+            ("current_health", self.current_health.clone().into()),
+            ("max_health", self.max_health.clone().into()),
+            ("current_attack", self.current_attack.clone().into()),
+            ("max_attack", self.max_attack.clone().into()),
+            ("current_defense", self.current_defense.clone().into()),
+            ("max_defense", self.max_defense.clone().into()),
+            ("current_speed", self.current_speed.clone().into()),
+            ("max_speed", self.max_speed.clone().into()),
+            (
+                "current_intelligence",
+                self.current_intelligence.clone().into(),
+            ),
+            ("max_intelligence", self.max_intelligence.clone().into()),
+            ("current_magic", self.current_magic.clone().into()),
+            ("max_magic", self.max_magic.clone().into()),
+        ];
+        let mnstr = match insert_resource!(Mnstr, params).await {
             Ok(mnstr) => mnstr,
             Err(e) => {
                 println!("[Mnstr::create] Failed to create mnstr: {:?}", e);
