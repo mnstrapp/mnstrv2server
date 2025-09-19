@@ -5,7 +5,8 @@ use time::OffsetDateTime;
 
 use crate::{
     database::{traits::DatabaseResource, values::DatabaseValue},
-    find_all_resources_where_fields, find_one_resource_where_fields, insert_resource,
+    delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
+    insert_resource,
     models::transaction::{Transaction, TransactionStatus, TransactionType},
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
@@ -35,6 +36,7 @@ pub struct Wallet {
 
     // Relationships
     pub coins: i32,
+    pub transactions: Vec<Transaction>,
 }
 
 impl Wallet {
@@ -46,6 +48,7 @@ impl Wallet {
             updated_at: None,
             archived_at: None,
             coins: 0,
+            transactions: Vec::new(),
         }
     }
 
@@ -56,6 +59,29 @@ impl Wallet {
                 Err(e) => return Some(e.into()),
             };
         *self = wallet;
+        None
+    }
+
+    pub async fn delete_permanent(&mut self) -> Option<anyhow::Error> {
+        let wallet = match Self::find_one(self.id.clone()).await {
+            Ok(wallet) => wallet,
+            Err(e) => return Some(e.into()),
+        };
+        *self = wallet;
+
+        for transaction in self.transactions.iter_mut() {
+            if let Some(error) = transaction.delete_permanent().await {
+                println!("[Wallet::delete] Failed to delete transaction: {:?}", error);
+                return Some(error);
+            }
+        }
+
+        match delete_resource_where_fields!(Wallet, vec![("id", self.id.clone().into())], true)
+            .await
+        {
+            Ok(_) => (),
+            Err(e) => return Some(e.into()),
+        };
         None
     }
 
@@ -146,6 +172,7 @@ impl Wallet {
                 return Some(e.into());
             }
         };
+        self.transactions = transactions.clone();
         self.coins = transactions.iter().map(|t| t.transaction_amount).sum();
         None
     }
@@ -184,6 +211,7 @@ impl DatabaseResource for Wallet {
             updated_at,
             archived_at,
             coins: 0,
+            transactions: Vec::new(),
         })
     }
 

@@ -242,16 +242,12 @@ impl Mnstr {
         None
     }
 
-    pub async fn delete(&mut self) -> Option<anyhow::Error> {
-        match delete_resource_where_fields!(Mnstr, vec![("id", self.id.clone().into())]).await {
+    pub async fn delete_permanent(&mut self) -> Option<anyhow::Error> {
+        match delete_resource_where_fields!(Mnstr, vec![("id", self.id.clone().into())], true).await
+        {
             Ok(_) => (),
             Err(e) => return Some(e.into()),
         };
-        let mnstr = match Self::find_one(self.id.clone()).await {
-            Ok(mnstr) => mnstr,
-            Err(e) => return Some(e.into()),
-        };
-        *self = mnstr;
         None
     }
 

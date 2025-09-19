@@ -1,6 +1,6 @@
 use juniper::FieldError;
 
-use crate::models::user::User;
+use crate::{graphql::Ctx, models::user::User};
 
 pub struct UserMutationType;
 
@@ -13,6 +13,10 @@ impl UserMutationType {
         qr_code: String,
     ) -> Result<User, FieldError> {
         register(email, password, display_name, qr_code).await
+    }
+
+    async fn unregister(ctx: &Ctx) -> Result<bool, FieldError> {
+        unregister(ctx).await
     }
 }
 
@@ -38,4 +42,26 @@ pub async fn register(
     };
 
     Ok(user)
+}
+
+pub async fn unregister(ctx: &Ctx) -> Result<bool, FieldError> {
+    if let None = ctx.session {
+        return Err(FieldError::from("Invalid session"));
+    }
+    let session = ctx.session.as_ref().unwrap().clone();
+
+    let mut user = match User::find_one(session.user_id.clone()).await {
+        Ok(user) => user,
+        Err(e) => {
+            println!("[unregister] Failed to get user: {:?}", e);
+            return Err(FieldError::from("Failed to get user"));
+        }
+    };
+
+    if let Some(error) = user.delete_permanent().await {
+        println!("[unregister] Failed to delete user: {:?}", error);
+        return Err(FieldError::from("Failed to delete user"));
+    }
+
+    Ok(true)
 }

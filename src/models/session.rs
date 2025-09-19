@@ -6,7 +6,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
-    database::traits::DatabaseResource,
+    database::{traits::DatabaseResource, values::DatabaseValue},
     delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
     insert_resource,
     models::user::User,
@@ -107,6 +107,16 @@ impl Session {
         None
     }
 
+    pub async fn delete_permanent(&mut self) -> Option<anyhow::Error> {
+        match delete_resource_where_fields!(Session, vec![("id", self.id.clone().into())], true)
+            .await
+        {
+            Ok(_) => (),
+            Err(e) => return Some(e.into()),
+        };
+        None
+    }
+
     pub async fn find_one(id: String) -> Result<Self, anyhow::Error> {
         let mut session =
             match find_one_resource_where_fields!(Session, vec![("id", id.clone().into())]).await {
@@ -135,6 +145,16 @@ impl Session {
     #[allow(dead_code)]
     pub async fn find_all() -> Result<Vec<Self>, anyhow::Error> {
         let sessions = match find_all_resources_where_fields!(Session, vec![]).await {
+            Ok(sessions) => sessions,
+            Err(e) => return Err(e.into()),
+        };
+        Ok(sessions)
+    }
+
+    pub async fn find_all_by(
+        params: Vec<(&str, DatabaseValue)>,
+    ) -> Result<Vec<Self>, anyhow::Error> {
+        let sessions = match find_all_resources_where_fields!(Session, params).await {
             Ok(sessions) => sessions,
             Err(e) => return Err(e.into()),
         };

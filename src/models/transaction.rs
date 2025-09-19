@@ -217,8 +217,9 @@ impl Transaction {
         None
     }
 
-    pub async fn delete(&mut self) -> Option<anyhow::Error> {
-        match delete_resource_where_fields!(Transaction, vec![("id", self.id.clone().into())]).await
+    pub async fn delete_permanent(&mut self) -> Option<anyhow::Error> {
+        match delete_resource_where_fields!(Transaction, vec![("id", self.id.clone().into())], true)
+            .await
         {
             Ok(_) => (),
             Err(e) => {
@@ -229,14 +230,6 @@ impl Transaction {
                 return Some(e.into());
             }
         };
-        let transaction = match Self::find_one(self.id.clone()).await {
-            Ok(transaction) => transaction,
-            Err(e) => {
-                println!("[Transaction::delete] Failed to find transaction: {:?}", e);
-                return Some(e.into());
-            }
-        };
-        *self = transaction;
         None
     }
 

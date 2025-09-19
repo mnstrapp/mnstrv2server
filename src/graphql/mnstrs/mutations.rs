@@ -65,20 +65,6 @@ pub async fn collect(
         return Err(FieldError::from("Invalid session"));
     }
     let session = ctx.session.as_ref().unwrap().clone();
-    println!("[collect] qr code: {:?}", qr_code);
-    println!("[collect] name: {:?}", name);
-    println!("[collect] current health: {:?}", current_health);
-    println!("[collect] max health: {:?}", max_health);
-    println!("[collect] current attack: {:?}", current_attack);
-    println!("[collect] max attack: {:?}", max_attack);
-    println!("[collect] current defense: {:?}", current_defense);
-    println!("[collect] max defense: {:?}", max_defense);
-    println!("[collect] current speed: {:?}", current_speed);
-    println!("[collect] max speed: {:?}", max_speed);
-    println!("[collect] current intelligence: {:?}", current_intelligence);
-    println!("[collect] max intelligence: {:?}", max_intelligence);
-    println!("[collect] current magic: {:?}", current_magic);
-    println!("[collect] max magic: {:?}", max_magic);
 
     let mut mnstr = Mnstr::new(
         session.user_id.clone(),

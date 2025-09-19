@@ -10,7 +10,7 @@ use crate::{
     database::{traits::DatabaseResource, values::DatabaseValue},
     delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
     insert_resource,
-    models::{generated::level_xp::XP_FOR_LEVEL, mnstr::Mnstr, wallet::Wallet},
+    models::{generated::level_xp::XP_FOR_LEVEL, mnstr::Mnstr, session::Session, wallet::Wallet},
     update_resource,
     utils::{
         passwords::hash_password,
@@ -50,7 +50,7 @@ pub struct User {
 
     // Relationships
     pub wallet: Option<Wallet>,
-    pub mnstrs: Option<Vec<Mnstr>>,
+    pub mnstrs: Vec<Mnstr>,
 }
 
 impl User {
@@ -70,7 +70,7 @@ impl User {
             updated_at: None,
             archived_at: None,
             wallet: None,
-            mnstrs: None,
+            mnstrs: Vec::new(),
         }
     }
 
@@ -127,16 +127,62 @@ impl User {
         None
     }
 
-    pub async fn delete(&mut self) -> Option<anyhow::Error> {
-        match delete_resource_where_fields!(User, vec![("id", self.id.clone().into())]).await {
-            Ok(_) => (),
-            Err(e) => return Some(e.into()),
-        };
+    pub async fn delete_permanent(&mut self) -> Option<anyhow::Error> {
         let user = match Self::find_one(self.id.clone()).await {
             Ok(user) => user,
-            Err(e) => return Some(e.into()),
+            Err(e) => {
+                println!("[User::delete_permanent] Failed to get user: {:?}", e);
+                return Some(e.into());
+            }
         };
+
         *self = user;
+
+        for mnstr in self.mnstrs.iter_mut() {
+            if let Some(error) = mnstr.delete_permanent().await {
+                println!(
+                    "[User::delete_permanent] Failed to delete mnstr: {:?}",
+                    error
+                );
+                return Some(error);
+            }
+        }
+
+        let mut sessions =
+            match Session::find_all_by(vec![("user_id", self.id.clone().into())]).await {
+                Ok(sessions) => sessions,
+                Err(e) => {
+                    println!("[User::delete_permanent] Failed to get sessions: {:?}", e);
+                    return Some(e.into());
+                }
+            };
+
+        for session in sessions.iter_mut() {
+            if let Some(error) = session.delete_permanent().await {
+                println!(
+                    "[User::delete_permanent] Failed to delete session: {:?}",
+                    error
+                );
+                return Some(error);
+            }
+        }
+
+        if let Some(error) = self.wallet.as_mut().unwrap().delete_permanent().await {
+            println!(
+                "[User::delete_permanent] Failed to delete wallet: {:?}",
+                error
+            );
+            return Some(error);
+        }
+
+        match delete_resource_where_fields!(User, vec![("id", self.id.clone().into())], true).await
+        {
+            Ok(_) => (),
+            Err(e) => {
+                println!("[User::delete_permanent] Failed to delete user: {:?}", e);
+                return Some(e.into());
+            }
+        };
         None
     }
 
@@ -271,7 +317,7 @@ impl User {
                 return Some(e.into());
             }
         };
-        self.mnstrs = Some(mnstrs);
+        self.mnstrs = mnstrs;
         None
     }
 
@@ -350,7 +396,7 @@ impl User {
                 );
                 return Some(error.into());
             }
-            self.mnstrs = Some(vec![found_mnstr]);
+            self.mnstrs = vec![found_mnstr];
             return None;
         }
 
@@ -386,7 +432,7 @@ impl User {
             return Some(error.into());
         }
 
-        self.mnstrs = Some(vec![mnstr]);
+        self.mnstrs = vec![mnstr];
         None
     }
 
@@ -498,7 +544,7 @@ impl DatabaseResource for User {
             updated_at,
             archived_at,
             wallet: None,
-            mnstrs: None,
+            mnstrs: Vec::new(),
         })
     }
     fn has_id() -> bool {
