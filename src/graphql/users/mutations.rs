@@ -1,6 +1,6 @@
 use juniper::FieldError;
 
-use crate::{graphql::Ctx, models::user::User};
+use crate::{graphql::Ctx, models::user::User, utils::passwords::hash_password};
 
 pub struct UserMutationType;
 
@@ -17,6 +17,10 @@ impl UserMutationType {
 
     async fn unregister(ctx: &Ctx) -> Result<bool, FieldError> {
         unregister(ctx).await
+    }
+
+    async fn reset_password(id: String, password: String) -> Result<bool, FieldError> {
+        reset_password(id, password).await
     }
 }
 
@@ -61,6 +65,25 @@ pub async fn unregister(ctx: &Ctx) -> Result<bool, FieldError> {
     if let Some(error) = user.delete_permanent().await {
         println!("[unregister] Failed to delete user: {:?}", error);
         return Err(FieldError::from("Failed to delete user"));
+    }
+
+    Ok(true)
+}
+
+pub async fn reset_password(id: String, password: String) -> Result<bool, FieldError> {
+    let user = match User::find_one(id).await {
+        Ok(user) => user,
+        Err(e) => {
+            println!("[reset_password] Failed to get user: {:?}", e);
+            return Err(FieldError::from("Failed to get user"));
+        }
+    };
+
+    let mut user = user.clone();
+    user.password_hash = hash_password(&password);
+    if let Some(error) = user.update().await {
+        println!("[reset_password] Failed to update user: {:?}", error);
+        return Err(FieldError::from("Failed to update user"));
     }
 
     Ok(true)
