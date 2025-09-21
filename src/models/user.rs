@@ -109,6 +109,7 @@ impl User {
             ("display_name", self.display_name.clone().into()),
             ("experience_level", self.experience_level.clone().into()),
             ("experience_points", self.experience_points.clone().into()),
+            ("password_hash", self.password_hash.clone().into()),
         ];
         let mut user = match update_resource!(User, self.id.clone(), params).await {
             Ok(user) => user,
