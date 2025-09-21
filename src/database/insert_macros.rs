@@ -24,6 +24,7 @@
 /// // Basic insertion
 /// let params = vec![
 ///     ("email", "newuser@example.com".into()),
+///     ("phone", "1234567890".into()),
 ///     ("name", "John Doe".into()),
 ///     ("password_hash", "hashed_password".into())
 /// ];
@@ -44,7 +45,7 @@
 /// ## Basic Insert with Auto Fields
 /// ```sql
 /// INSERT INTO users (
-///     email, name, password_hash, id, created_at, updated_at
+///     email, phone, name, password_hash, id, created_at, updated_at
 /// ) VALUES (
 ///     Cast($1 AS VARCHAR), Cast($2 AS VARCHAR), Cast($3 AS VARCHAR),
 ///     Cast($4 AS VARCHAR), CAST($5 AS TIMESTAMP), CAST($6 AS TIMESTAMP)

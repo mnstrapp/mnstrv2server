@@ -16,7 +16,6 @@ use sqlx::{Encode, Postgres, Type, encode::IsNull, error::BoxDynError};
 use std::fmt::{self, Display};
 use std::iter::FromIterator;
 use time::OffsetDateTime;
-use time::format_description::well_known::Iso8601;
 
 /// Represents a type-safe database value with proper SQL encoding.
 ///
@@ -172,6 +171,12 @@ impl FromIterator<i64> for DatabaseValue {
 impl FromIterator<f64> for DatabaseValue {
     fn from_iter<I: IntoIterator<Item = f64>>(iter: I) -> Self {
         DatabaseValue::Float(iter.into_iter().map(|f| f.to_string()).collect())
+    }
+}
+
+impl From<Option<String>> for DatabaseValue {
+    fn from(s: Option<String>) -> Self {
+        DatabaseValue::String(s.unwrap_or_default())
     }
 }
 

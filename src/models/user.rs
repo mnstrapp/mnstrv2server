@@ -21,10 +21,14 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize, GraphQLObject, Clone)]
 pub struct User {
     pub id: String,
-    pub email: String,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub email_verification_code: Option<String>,
+    pub phone_verification_code: Option<String>,
+    pub email_verified: bool,
+    pub phone_verified: bool,
     pub display_name: String,
     pub password_hash: String,
-    pub qr_code: String,
     pub experience_level: i32,
     pub experience_points: i32,
     pub experience_to_next_level: i32, // calculated based on the experience_level
@@ -54,14 +58,23 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(email: String, password: String, display_name: String, qr_code: String) -> Self {
+    pub fn new(
+        email: Option<String>,
+        phone: Option<String>,
+        password: String,
+        display_name: String,
+    ) -> Self {
         let password_hash = hash_password(&password);
         Self {
             id: "".to_string(),
             email,
+            phone,
+            email_verification_code: None,
+            phone_verification_code: None,
+            email_verified: false,
+            phone_verified: false,
             password_hash,
             display_name,
-            qr_code,
             experience_level: 0,
             experience_points: 0,
             experience_to_next_level: 0,
@@ -80,10 +93,20 @@ impl User {
             self.display_name.clone()
         );
         let params = vec![
-            ("email", self.email.clone().into()),
             ("password_hash", self.password_hash.clone().into()),
-            ("display_name", self.display_name.clone().into()),
-            ("qr_code", self.qr_code.clone().into()),
+            ("phone", self.phone.clone().into()),
+            ("email", self.email.clone().into()),
+            ("display_name ", self.display_name.clone().into()),
+            ("email_verified", self.email_verified.clone().into()),
+            ("phone_verified", self.phone_verified.clone().into()),
+            (
+                "email_verification_code",
+                self.email_verification_code.clone().into(),
+            ),
+            (
+                "phone_verification_code",
+                self.phone_verification_code.clone().into(),
+            ),
         ];
         let mut user = match insert_resource!(User, params).await {
             Ok(user) => user,
@@ -107,6 +130,18 @@ impl User {
 
         let params = vec![
             ("display_name", self.display_name.clone().into()),
+            ("phone", self.phone.clone().into()),
+            ("email", self.email.clone().into()),
+            (
+                "email_verification_code",
+                self.email_verification_code.clone().into(),
+            ),
+            (
+                "phone_verification_code",
+                self.phone_verification_code.clone().into(),
+            ),
+            ("email_verified", self.email_verified.clone().into()),
+            ("phone_verified", self.phone_verified.clone().into()),
             ("experience_level", self.experience_level.clone().into()),
             ("experience_points", self.experience_points.clone().into()),
             ("password_hash", self.password_hash.clone().into()),
@@ -344,13 +379,6 @@ impl User {
             );
             return Some(error.into());
         }
-        if let Some(error) = Box::pin(self.create_mnstr()).await {
-            println!(
-                "[User::create_relationships] Failed to create mnstr: {:?}",
-                error
-            );
-            return Some(error.into());
-        }
         None
     }
 
@@ -379,61 +407,6 @@ impl User {
             return Some(error.into());
         }
         self.wallet = Some(wallet);
-        None
-    }
-
-    pub async fn create_mnstr(&mut self) -> Option<anyhow::Error> {
-        println!("[User::create_mnstr] Creating mnstr: {:?}", self.id);
-        let found_mnstr = match Mnstr::find_one_by(vec![("user_id", self.id.clone().into())]).await
-        {
-            Ok(mnstr) => Some(mnstr),
-            Err(_) => None,
-        };
-        if let Some(mut found_mnstr) = found_mnstr {
-            if let Some(error) = found_mnstr.get_relationships().await {
-                println!(
-                    "[User::create_mnstr] Failed to get mnstr relationships: {:?}",
-                    error
-                );
-                return Some(error.into());
-            }
-            self.mnstrs = vec![found_mnstr];
-            return None;
-        }
-
-        let mut mnstr = Mnstr::new(
-            self.id.clone(),
-            self.display_name.clone(),
-            format!("{}'s Mnstr", self.display_name.clone()),
-            self.qr_code.clone(),
-        );
-        if let Some(error) = mnstr.create().await {
-            println!("[User::create_mnstr] Failed to create mnstr: {:?}", error);
-            return Some(error.into());
-        }
-        if let Some(error) = mnstr.get_relationships().await {
-            println!(
-                "[User::create_mnstr] Failed to get mnstr relationships: {:?}",
-                error
-            );
-            return Some(error.into());
-        }
-        mnstr.current_attack = mnstr.current_attack * 2;
-        mnstr.max_attack = mnstr.max_attack * 2;
-        mnstr.current_defense = mnstr.current_defense * 2;
-        mnstr.max_defense = mnstr.max_defense * 2;
-        mnstr.current_speed = mnstr.current_speed * 2;
-        mnstr.max_speed = mnstr.max_speed * 2;
-        mnstr.current_intelligence = mnstr.current_intelligence * 2;
-        mnstr.max_intelligence = mnstr.max_intelligence * 2;
-        mnstr.current_magic = mnstr.current_magic * 2;
-        mnstr.max_magic = mnstr.max_magic * 2;
-        if let Some(error) = mnstr.update().await {
-            println!("[User::create_mnstr] Failed to update mnstr: {:?}", error);
-            return Some(error.into());
-        }
-
-        self.mnstrs = vec![mnstr];
         None
     }
 
@@ -534,9 +507,13 @@ impl DatabaseResource for User {
         Ok(User {
             id: row.get("id"),
             email: row.get("email"),
+            phone: row.get("phone"),
             display_name: row.get("display_name"),
             password_hash: row.get("password_hash"),
-            qr_code: row.get("qr_code"),
+            email_verification_code: row.get("email_verification_code"),
+            phone_verification_code: row.get("phone_verification_code"),
+            email_verified: row.get("email_verified"),
+            phone_verified: row.get("phone_verified"),
             experience_level,
             experience_points,
             experience_to_next_level: 0,

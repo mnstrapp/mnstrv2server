@@ -1,1 +1,5 @@
 export DATABASE_URL=postgresql://user:password@host:port/database
+export TWILIO_ACCOUNT_SSID="<ssid>"
+export TWILIO_AUTH_TOKEN="<token>"
+export TWILIO_PHONE_NUMBER="<number>"
+export SENDGRID_API_KEY="<key>"

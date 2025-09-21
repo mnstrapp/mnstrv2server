@@ -34,7 +34,8 @@ use sqlx::{Error, postgres::PgRow};
 ///
 /// pub struct User {
 ///     pub id: String,
-///     pub email: String,
+///     pub email: Option<String>,
+///     pub phone: Option<String>,
 ///     pub name: String,
 ///     pub created_at: String,
 ///     pub updated_at: String,
@@ -46,6 +47,7 @@ use sqlx::{Error, postgres::PgRow};
 ///         Ok(User {
 ///             id: row.try_get("id")?,
 ///             email: row.try_get("email")?,
+///             phone: row.try_get("phone")?,
 ///             name: row.try_get("name")?,
 ///             created_at: row.try_get("created_at")?,
 ///             updated_at: row.try_get("updated_at")?,

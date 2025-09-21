@@ -10,8 +10,8 @@ impl UserQueryType {
         get_user(ctx).await
     }
 
-    async fn forgot_password(email: String, qr_code: String) -> Result<String, FieldError> {
-        forgot_password(email, qr_code).await
+    async fn forgot_password(email: String) -> Result<String, FieldError> {
+        forgot_password(email).await
     }
 }
 
@@ -31,8 +31,8 @@ async fn get_user(ctx: &Ctx) -> Result<User, FieldError> {
     Ok(user)
 }
 
-pub async fn forgot_password(email: String, qr_code: String) -> Result<String, FieldError> {
-    let user_params = vec![("email", email.into()), ("qr_code", qr_code.into())];
+pub async fn forgot_password(email: String) -> Result<String, FieldError> {
+    let user_params = vec![("email", email.into())];
     match User::find_one_by(user_params).await {
         Ok(user) => Ok(user.id),
         Err(e) => {
