@@ -1,5 +1,3 @@
-use core::error;
-
 use anyhow::anyhow;
 use juniper::GraphQLObject;
 use serde::{Deserialize, Serialize};
@@ -501,8 +499,24 @@ impl DatabaseResource for User {
             Some(archived_at) => archived_at,
             None => None,
         };
+
         let experience_level = row.get("experience_level");
         let experience_points = row.get("experience_points");
+
+        let email_verification_code = match row.get::<Option<String>, _>("email_verification_code")
+        {
+            Some(code) => Some(code),
+            None => None,
+        };
+
+        let phone_verification_code = match row.get::<Option<String>, _>("phone_verification_code")
+        {
+            Some(code) => Some(code),
+            None => None,
+        };
+
+        let email_verified = row.get::<bool, _>("email_verified");
+        let phone_verified = row.get::<bool, _>("phone_verified");
 
         Ok(User {
             id: row.get("id"),
@@ -510,10 +524,10 @@ impl DatabaseResource for User {
             phone: row.get("phone"),
             display_name: row.get("display_name"),
             password_hash: row.get("password_hash"),
-            email_verification_code: row.get("email_verification_code"),
-            phone_verification_code: row.get("phone_verification_code"),
-            email_verified: row.get("email_verified"),
-            phone_verified: row.get("phone_verified"),
+            email_verification_code,
+            phone_verification_code,
+            email_verified,
+            phone_verified,
             experience_level,
             experience_points,
             experience_to_next_level: 0,

@@ -20,6 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let _ = env::var("TWILIO_AUTH_TOKEN")?;
     let _ = env::var("TWILIO_PHONE_NUMBER")?;
     let _ = env::var("SENDGRID_API_KEY")?;
+    let _ = env::var("SENDGRID_FROM_EMAIL")?;
     let database_url = env::var("DATABASE_URL")?;
     let pool = PgPoolOptions::new().connect(&*database_url).await?;
     let cors = CorsOptions::default().to_cors().unwrap();

@@ -1,6 +1,10 @@
 use juniper::FieldError;
 
-use crate::{graphql::Ctx, models::user::User};
+use crate::{
+    graphql::{Ctx, users::utils::send_email_verification_code},
+    models::user::User,
+    utils::passwords::{generate_verification_code, hash_password},
+};
 
 pub struct UserQueryType;
 
@@ -33,11 +37,34 @@ async fn get_user(ctx: &Ctx) -> Result<User, FieldError> {
 
 pub async fn forgot_password(email: String) -> Result<String, FieldError> {
     let user_params = vec![("email", email.into())];
-    match User::find_one_by(user_params).await {
-        Ok(user) => Ok(user.id),
+    let mut user = match User::find_one_by(user_params).await {
+        Ok(user) => user,
         Err(e) => {
             println!("[forgot_password] Failed to get user: {:?}", e);
             return Err(FieldError::from("Failed to find user"));
         }
+    };
+
+    let code = generate_verification_code();
+    user.email_verification_code = Some(code);
+    if let Some(error) = user.update().await {
+        println!("[forgot_password] Failed to update user: {:?}", error);
+        return Err(FieldError::from("Failed to update user"));
     }
+
+    if let Err(error) = send_email_verification_code(
+        user.display_name,
+        user.email.unwrap(),
+        user.email_verification_code.unwrap(),
+    )
+    .await
+    {
+        println!(
+            "[forgot_password] Failed to send email verification code: {:?}",
+            error
+        );
+        return Err(FieldError::from("Failed to send email verification code"));
+    }
+
+    Ok(user.id)
 }

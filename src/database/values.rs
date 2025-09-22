@@ -174,12 +174,6 @@ impl FromIterator<f64> for DatabaseValue {
     }
 }
 
-impl From<Option<String>> for DatabaseValue {
-    fn from(s: Option<String>) -> Self {
-        DatabaseValue::String(s.unwrap_or_default())
-    }
-}
-
 impl From<&str> for DatabaseValue {
     fn from(s: &str) -> Self {
         DatabaseValue::String(s.to_string())
@@ -225,5 +219,14 @@ impl From<i64> for DatabaseValue {
 impl From<f64> for DatabaseValue {
     fn from(f: f64) -> Self {
         DatabaseValue::Float(f.to_string())
+    }
+}
+
+impl<T: Into<DatabaseValue>> From<Option<T>> for DatabaseValue {
+    fn from(option: Option<T>) -> Self {
+        if option.is_none() {
+            return DatabaseValue::None;
+        }
+        option.unwrap().into()
     }
 }

@@ -1,11 +1,10 @@
-use std::env;
-
 use juniper::FieldError;
-use rand::Rng;
-use sendgrid::{Mail, SGClient};
-use twilio::{Client, OutboundMessage};
 
-use crate::{graphql::Ctx, models::user::User, utils::passwords::hash_password};
+use crate::{
+    graphql::{Ctx, users::utils::send_email_verification_code},
+    models::user::User,
+    utils::passwords::{generate_verification_code, hash_password},
+};
 
 pub struct UserMutationType;
 
@@ -45,20 +44,12 @@ pub async fn register(
 ) -> Result<User, FieldError> {
     let mut user = User::new(email.clone(), phone.clone(), password, display_name.clone());
 
-    let code = match generate_verification_code().await {
-        Ok(code) => code,
-        Err(e) => {
-            println!("[register] Failed to generate verification code: {:?}", e);
-            return Err(FieldError::from("Failed to generate verification code"));
-        }
-    };
-
     if email != None {
-        user.email_verification_code = Some(code.to_string());
+        user.email_verification_code = Some(generate_verification_code());
         user.email_verified = false;
     }
     if phone != None {
-        user.phone_verification_code = Some(code.to_string());
+        user.phone_verification_code = Some(generate_verification_code());
         user.phone_verified = false;
     }
 
@@ -68,8 +59,12 @@ pub async fn register(
     }
 
     if email != None {
-        if let Err(error) =
-            send_email_verification_code(display_name, email.unwrap(), code.clone()).await
+        if let Err(error) = send_email_verification_code(
+            display_name,
+            email.unwrap(),
+            user.email_verification_code.unwrap(),
+        )
+        .await
         {
             println!(
                 "[register] Failed to send email verification code: {:?}",
@@ -165,7 +160,7 @@ pub async fn unregister(ctx: &Ctx) -> Result<bool, FieldError> {
 }
 
 pub async fn reset_password(id: String, password: String) -> Result<bool, FieldError> {
-    let user = match User::find_one(id).await {
+    let mut user = match User::find_one(id).await {
         Ok(user) => user,
         Err(e) => {
             println!("[reset_password] Failed to get user: {:?}", e);
@@ -173,7 +168,15 @@ pub async fn reset_password(id: String, password: String) -> Result<bool, FieldE
         }
     };
 
-    let mut user = user.clone();
+    println!("[reset_password] User: {:?}", user);
+
+    if user.email != None && user.email_verified != true {
+        return Err(FieldError::from("User email not verified"));
+    }
+    if user.phone != None && user.phone_verified != true {
+        return Err(FieldError::from("User phone not verified"));
+    }
+
     user.password_hash = hash_password(&password);
     if let Some(error) = user.update().await {
         println!("[reset_password] Failed to update user: {:?}", error);
@@ -181,58 +184,4 @@ pub async fn reset_password(id: String, password: String) -> Result<bool, FieldE
     }
 
     Ok(true)
-}
-
-async fn generate_verification_code() -> Result<String, FieldError> {
-    let code = rand::rng().random_range(10000..99999);
-    Ok(code.to_string())
-}
-
-async fn send_phone_verification_code(phone: String, code: String) -> Result<bool, FieldError> {
-    let client = Client::new(
-        env::var("TWILIO_ACCOUNT_SSID").unwrap().as_str(),
-        env::var("TWILIO_AUTH_TOKEN").unwrap().as_str(),
-    );
-    let message = format!("Your MNSTR verification code is: {}", code);
-    match client
-        .send_message(OutboundMessage::new(
-            env::var("TWILIO_PHONE_NUMBER").unwrap().as_str(),
-            phone.as_str(),
-            message.as_str(),
-        ))
-        .await
-    {
-        Ok(_) => Ok(true),
-        Err(e) => {
-            println!(
-                "[send_phone_verification_code] Failed to send message: {:?}",
-                e
-            );
-            return Err(FieldError::from("Failed to send message"));
-        }
-    }
-}
-
-async fn send_email_verification_code(
-    display_name: String,
-    email: String,
-    code: String,
-) -> Result<bool, FieldError> {
-    let client = SGClient::new(env::var("SENDGRID_API_KEY").unwrap().as_str());
-    let message = format!("Your MNSTR verification code is: {}", code);
-    let message = Mail::new()
-        .add_text(message.as_str())
-        .add_from("MNSTR <mnstrappdev@gmail.com>")
-        .add_subject("MNSTR Verification Code")
-        .add_to((email.as_str(), display_name.as_str()).into());
-    match client.send(message).await {
-        Ok(_) => Ok(true),
-        Err(e) => {
-            println!(
-                "[send_email_verification_code] Failed to send email: {:?}",
-                e
-            );
-            return Err(FieldError::from("Failed to send email"));
-        }
-    }
 }
