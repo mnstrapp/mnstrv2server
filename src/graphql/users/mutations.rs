@@ -168,8 +168,6 @@ pub async fn reset_password(id: String, password: String) -> Result<bool, FieldE
         }
     };
 
-    println!("[reset_password] User: {:?}", user);
-
     if user.email != None && user.email_verified != true {
         return Err(FieldError::from("User email not verified"));
     }
