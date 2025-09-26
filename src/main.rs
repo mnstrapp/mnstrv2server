@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         .mount("/", routes![index])
         .mount("/graphql", graphql::routes())
         .mount("/ws", websocket::routes())
-        .mount("/static", rocket::fs::StaticFiles::from("static"))
+        .mount("/static", rocket::fs::FileServer::from("static"))
         .manage(pool)
         .attach(cors)
         .launch()
