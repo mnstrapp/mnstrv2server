@@ -8,6 +8,7 @@ mod database;
 mod graphql;
 mod models;
 mod utils;
+mod websocket;
 
 #[get("/")]
 fn index() -> &'static str {
@@ -28,6 +29,8 @@ async fn main() -> anyhow::Result<()> {
     rocket::build()
         .mount("/", routes![index])
         .mount("/graphql", graphql::routes())
+        .mount("/ws", websocket::routes())
+        .mount("/static", rocket::fs::StaticFiles::from("static"))
         .manage(pool)
         .attach(cors)
         .launch()
