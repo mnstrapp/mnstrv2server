@@ -84,7 +84,7 @@ pub async fn register(
     //     }
     // }
 
-    let user = match User::find_one(user.id.clone()).await {
+    let user = match User::find_one(user.id.clone(), false).await {
         Ok(user) => user,
         Err(e) => {
             println!("[register] Failed to get user: {:?}", e);
@@ -97,7 +97,7 @@ pub async fn register(
 
 pub async fn verify_email(id: String, code: String) -> Result<bool, FieldError> {
     let user_params = vec![("id", id.into()), ("email_verification_code", code.into())];
-    let mut user = match User::find_one_by(user_params).await {
+    let mut user = match User::find_one_by(user_params, false).await {
         Ok(user) => user,
         Err(e) => {
             println!("[verify_email] Failed to get user: {:?}", e);
@@ -118,7 +118,7 @@ pub async fn verify_email(id: String, code: String) -> Result<bool, FieldError> 
 
 pub async fn verify_phone(id: String, code: String) -> Result<bool, FieldError> {
     let user_params = vec![("id", id.into()), ("phone_verification_code", code.into())];
-    let mut user = match User::find_one_by(user_params).await {
+    let mut user = match User::find_one_by(user_params, false).await {
         Ok(user) => user,
         Err(e) => {
             println!("[verify_phone] Failed to get user: {:?}", e);
@@ -143,7 +143,7 @@ pub async fn unregister(ctx: &Ctx) -> Result<bool, FieldError> {
     }
     let session = ctx.session.as_ref().unwrap().clone();
 
-    let mut user = match User::find_one(session.user_id.clone()).await {
+    let mut user = match User::find_one(session.user_id.clone(), false).await {
         Ok(user) => user,
         Err(e) => {
             println!("[unregister] Failed to get user: {:?}", e);
@@ -160,7 +160,7 @@ pub async fn unregister(ctx: &Ctx) -> Result<bool, FieldError> {
 }
 
 pub async fn reset_password(id: String, password: String) -> Result<bool, FieldError> {
-    let mut user = match User::find_one(id).await {
+    let mut user = match User::find_one(id, false).await {
         Ok(user) => user,
         Err(e) => {
             println!("[reset_password] Failed to get user: {:?}", e);

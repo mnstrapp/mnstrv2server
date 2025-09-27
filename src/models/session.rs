@@ -167,7 +167,7 @@ impl Session {
     }
 
     pub async fn get_user(&mut self) -> Option<anyhow::Error> {
-        let user = match User::find_one(self.user_id.clone()).await {
+        let user = match User::find_one(self.user_id.clone(), false).await {
             Ok(user) => user,
             Err(e) => return Some(e),
         };

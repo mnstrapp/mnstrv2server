@@ -95,7 +95,7 @@ pub async fn update(
         return Err(FieldError::from("Invalid session"));
     }
 
-    let mut mnstr = Mnstr::find_one(id)
+    let mut mnstr = Mnstr::find_one(id, false)
         .await
         .map_err(|e| FieldError::from(e.to_string()))?;
 

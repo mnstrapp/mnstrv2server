@@ -162,7 +162,7 @@ impl User {
     }
 
     pub async fn delete_permanent(&mut self) -> Option<anyhow::Error> {
-        let user = match Self::find_one(self.id.clone()).await {
+        let user = match Self::find_one(self.id.clone(), false).await {
             Ok(user) => user,
             Err(e) => {
                 println!("[User::delete_permanent] Failed to get user: {:?}", e);
@@ -220,7 +220,7 @@ impl User {
         None
     }
 
-    pub async fn find_one(id: String) -> Result<Self, anyhow::Error> {
+    pub async fn find_one(id: String, get_relationships: bool) -> Result<Self, anyhow::Error> {
         let params = vec![("id", id.clone().into())];
         let mut user = match find_one_resource_where_fields!(User, params).await {
             Ok(user) => user,
@@ -229,15 +229,20 @@ impl User {
                 return Err(e.into());
             }
         };
-        if let Some(error) = user.get_relationships().await {
-            println!("[User::find_one] Failed to get relationships: {:?}", error);
-            return Err(error.into());
+        if get_relationships {
+            if let Some(error) = user.get_relationships().await {
+                println!("[User::find_one] Failed to get relationships: {:?}", error);
+                return Err(error.into());
+            }
         }
         user.update_experience_to_next_level();
         Ok(user)
     }
 
-    pub async fn find_one_by(params: Vec<(&str, DatabaseValue)>) -> Result<Self, anyhow::Error> {
+    pub async fn find_one_by(
+        params: Vec<(&str, DatabaseValue)>,
+        get_relationships: bool,
+    ) -> Result<Self, anyhow::Error> {
         let mut user = match find_one_resource_where_fields!(User, params).await {
             Ok(user) => user,
             Err(e) => {
@@ -245,18 +250,20 @@ impl User {
                 return Err(e.into());
             }
         };
-        if let Some(error) = user.get_relationships().await {
-            println!(
-                "[User::find_one_by] Failed to get relationships: {:?}",
-                error
-            );
-            return Err(error.into());
+        if get_relationships {
+            if let Some(error) = user.get_relationships().await {
+                println!(
+                    "[User::find_one_by] Failed to get relationships: {:?}",
+                    error
+                );
+                return Err(error.into());
+            }
         }
         user.update_experience_to_next_level();
         Ok(user)
     }
 
-    pub async fn find_all() -> Result<Vec<Self>, anyhow::Error> {
+    pub async fn find_all(get_relationships: bool) -> Result<Vec<Self>, anyhow::Error> {
         let mut users = match find_all_resources_where_fields!(User, vec![]).await {
             Ok(users) => users,
             Err(e) => {
@@ -266,9 +273,11 @@ impl User {
         };
         for user in users.iter_mut() {
             user.update_experience_to_next_level();
-            if let Some(error) = user.get_relationships().await {
-                println!("[User::find_all] Failed to get relationships: {:?}", error);
-                return Err(error.into());
+            if get_relationships {
+                if let Some(error) = user.get_relationships().await {
+                    println!("[User::find_all] Failed to get relationships: {:?}", error);
+                    return Err(error.into());
+                }
             }
         }
         Ok(users)
@@ -276,6 +285,7 @@ impl User {
 
     pub async fn find_all_by(
         params: Vec<(&str, DatabaseValue)>,
+        get_relationships: bool,
     ) -> Result<Vec<Self>, anyhow::Error> {
         let mut users = match find_all_resources_where_fields!(User, params).await {
             Ok(users) => users,
@@ -286,12 +296,14 @@ impl User {
         };
         for user in users.iter_mut() {
             user.update_experience_to_next_level();
-            if let Some(error) = user.get_relationships().await {
-                println!(
-                    "[User::find_all_by] Failed to get relationships: {:?}",
-                    error
-                );
-                return Err(error.into());
+            if get_relationships {
+                if let Some(error) = user.get_relationships().await {
+                    println!(
+                        "[User::find_all_by] Failed to get relationships: {:?}",
+                        error
+                    );
+                    return Err(error.into());
+                }
             }
         }
         Ok(users)

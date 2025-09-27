@@ -189,7 +189,7 @@ impl Mnstr {
         };
         *self = mnstr;
 
-        let mut user = match User::find_one(self.user_id.clone()).await {
+        let mut user = match User::find_one(self.user_id.clone(), false).await {
             Ok(user) => user,
             Err(e) => {
                 println!("[Mnstr::create] Failed to get user: {:?}", e);
@@ -251,7 +251,7 @@ impl Mnstr {
         None
     }
 
-    pub async fn find_one(id: String) -> Result<Self, anyhow::Error> {
+    pub async fn find_one(id: String, get_relationships: bool) -> Result<Self, anyhow::Error> {
         let mut mnstr =
             match find_one_resource_where_fields!(Mnstr, vec![("id", id.clone().into())]).await {
                 Ok(mnstr) => mnstr,
@@ -260,14 +260,19 @@ impl Mnstr {
                     return Err(e.into());
                 }
             };
-        if let Some(error) = mnstr.get_relationships().await {
-            println!("[Mnstr::find_one] Failed to get relationships: {:?}", error);
-            return Err(error.into());
+        if get_relationships {
+            if let Some(error) = mnstr.get_relationships().await {
+                println!("[Mnstr::find_one] Failed to get relationships: {:?}", error);
+                return Err(error.into());
+            }
         }
         Ok(mnstr)
     }
 
-    pub async fn find_one_by(params: Vec<(&str, DatabaseValue)>) -> Result<Self, anyhow::Error> {
+    pub async fn find_one_by(
+        params: Vec<(&str, DatabaseValue)>,
+        get_relationships: bool,
+    ) -> Result<Self, anyhow::Error> {
         let mut mnstr = match find_one_resource_where_fields!(Mnstr, params).await {
             Ok(mnstr) => mnstr,
             Err(e) => {
@@ -275,14 +280,16 @@ impl Mnstr {
                 return Err(e.into());
             }
         };
-        if let Some(error) = mnstr.get_relationships().await {
-            println!("[Mnstr::find_one] Failed to get relationships: {:?}", error);
-            return Err(error.into());
+        if get_relationships {
+            if let Some(error) = mnstr.get_relationships().await {
+                println!("[Mnstr::find_one] Failed to get relationships: {:?}", error);
+                return Err(error.into());
+            }
         }
         Ok(mnstr)
     }
 
-    pub async fn find_all() -> Result<Vec<Self>, anyhow::Error> {
+    pub async fn find_all(get_relationships: bool) -> Result<Vec<Self>, anyhow::Error> {
         let mut mnstrs = match find_all_resources_where_fields!(Mnstr, vec![]).await {
             Ok(mnstrs) => mnstrs,
             Err(e) => {
@@ -291,9 +298,11 @@ impl Mnstr {
             }
         };
         for mnstr in mnstrs.iter_mut() {
-            if let Some(error) = mnstr.get_relationships().await {
-                println!("[Mnstr::find_all] Failed to get relationships: {:?}", error);
-                return Err(error.into());
+            if get_relationships {
+                if let Some(error) = mnstr.get_relationships().await {
+                    println!("[Mnstr::find_all] Failed to get relationships: {:?}", error);
+                    return Err(error.into());
+                }
             }
         }
         Ok(mnstrs)
@@ -301,6 +310,7 @@ impl Mnstr {
 
     pub async fn find_all_by(
         params: Vec<(&str, DatabaseValue)>,
+        get_relationships: bool,
     ) -> Result<Vec<Self>, anyhow::Error> {
         let mut mnstrs = match find_all_resources_where_fields!(Mnstr, params).await {
             Ok(mnstrs) => mnstrs,
@@ -310,12 +320,14 @@ impl Mnstr {
             }
         };
         for mnstr in mnstrs.iter_mut() {
-            if let Some(error) = mnstr.get_relationships().await {
-                println!(
-                    "[Mnstr::find_all_by] Failed to get relationships: {:?}",
-                    error
-                );
-                return Err(error.into());
+            if get_relationships {
+                if let Some(error) = mnstr.get_relationships().await {
+                    println!(
+                        "[Mnstr::find_all_by] Failed to get relationships: {:?}",
+                        error
+                    );
+                    return Err(error.into());
+                }
             }
         }
         Ok(mnstrs)

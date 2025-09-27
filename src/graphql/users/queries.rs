@@ -25,7 +25,7 @@ async fn get_user(ctx: &Ctx) -> Result<User, FieldError> {
     }
     let session = ctx.session.as_ref().unwrap().clone();
 
-    let user = match User::find_one(session.user_id.clone()).await {
+    let user = match User::find_one(session.user_id.clone(), false).await {
         Ok(user) => user,
         Err(e) => {
             println!("[get_user] Failed to get user: {:?}", e);
@@ -37,7 +37,7 @@ async fn get_user(ctx: &Ctx) -> Result<User, FieldError> {
 
 pub async fn forgot_password(email: String) -> Result<String, FieldError> {
     let user_params = vec![("email", email.into())];
-    let mut user = match User::find_one_by(user_params).await {
+    let mut user = match User::find_one_by(user_params, false).await {
         Ok(user) => user,
         Err(e) => {
             println!("[forgot_password] Failed to get user: {:?}", e);
