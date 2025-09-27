@@ -25,7 +25,7 @@ async fn get_user(ctx: &Ctx) -> Result<User, FieldError> {
     }
     let session = ctx.session.as_ref().unwrap().clone();
 
-    let user = match User::find_one(session.user_id.clone(), false).await {
+    let user = match User::find_one(session.user_id.clone(), true).await {
         Ok(user) => user,
         Err(e) => {
             println!("[get_user] Failed to get user: {:?}", e);
