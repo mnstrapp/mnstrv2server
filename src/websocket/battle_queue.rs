@@ -28,14 +28,14 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
         if let None = session {
             let battle_queue_data = BattleQueueData::new(
                 BattleQueueDataAction::Connect,
-                session.as_ref().unwrap().user_id.clone(),
+                None,
                 None,
                 None,
                 None,
                 Some("Invalid session".to_string()),
             );
             let battle_queue = BattleQueue::new(
-                session.as_ref().unwrap().user_id.clone(),
+                None,
                 BattleQueueChannel::Lobby,
                 BattleQueueAction::Error,
                 battle_queue_data,
@@ -46,7 +46,7 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
 
         let battle_queue_data = BattleQueueData::new(
             BattleQueueDataAction::Connect,
-            session.as_ref().unwrap().user_id.clone(),
+            Some(session.as_ref().unwrap().user_id.clone()),
             None,
             None,
             None,
@@ -54,12 +54,12 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
         );
 
         let battle_queue = BattleQueue::new(
-            session.as_ref().unwrap().user_id.clone(),
+            Some(session.as_ref().unwrap().user_id.clone()),
             BattleQueueChannel::Lobby,
             BattleQueueAction::Joined,
             battle_queue_data,
         );
-
+        println!("Battle queue: {:?}", battle_queue);
         yield serde_json::to_string(&battle_queue).unwrap().into();
 
         for await message in ws {
@@ -72,6 +72,15 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
 enum BattleQueueChannel {
     Lobby,
     Battle,
+}
+
+impl std::fmt::Display for BattleQueueChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BattleQueueChannel::Lobby => write!(f, "lobby"),
+            BattleQueueChannel::Battle => write!(f, "battle"),
+        }
+    }
 }
 
 impl From<String> for BattleQueueChannel {
@@ -95,6 +104,7 @@ enum BattleQueueAction {
     Accepted,
     Rejected,
     Cancelled,
+    Watching,
 }
 
 impl std::fmt::Display for BattleQueueAction {
@@ -109,6 +119,7 @@ impl std::fmt::Display for BattleQueueAction {
             BattleQueueAction::Accepted => write!(f, "accepted"),
             BattleQueueAction::Rejected => write!(f, "rejected"),
             BattleQueueAction::Cancelled => write!(f, "cancelled"),
+            BattleQueueAction::Watching => write!(f, "watching"),
         }
     }
 }
@@ -119,22 +130,23 @@ impl From<String> for BattleQueueAction {
             "error" => BattleQueueAction::Error,
             "joined" => BattleQueueAction::Joined,
             "left" => BattleQueueAction::Left,
-
             "ready" => BattleQueueAction::Ready,
             "unready" => BattleQueueAction::Unready,
             "requested" => BattleQueueAction::Requested,
             "accepted" => BattleQueueAction::Accepted,
             "rejected" => BattleQueueAction::Rejected,
             "cancelled" => BattleQueueAction::Cancelled,
+            "watching" => BattleQueueAction::Watching,
             _ => BattleQueueAction::Joined,
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct BattleQueue {
     id: String,
-    user_id: String,
+    user_id: Option<String>,
     channel: BattleQueueChannel,
     action: BattleQueueAction,
     data: BattleQueueData,
@@ -160,7 +172,7 @@ struct BattleQueue {
 
 impl BattleQueue {
     fn new(
-        user_id: String,
+        user_id: Option<String>,
         channel: BattleQueueChannel,
         action: BattleQueueAction,
         data: BattleQueueData,
@@ -172,8 +184,8 @@ impl BattleQueue {
             channel,
             action,
             data,
-            created_at: None,
-            updated_at: None,
+            created_at: Some(OffsetDateTime::now_utc()),
+            updated_at: Some(OffsetDateTime::now_utc()),
             archived_at: None,
         }
     }
@@ -193,7 +205,10 @@ impl DatabaseResource for BattleQueue {
 
         Ok(BattleQueue {
             id: row.get("id"),
-            user_id: row.get("user_id"),
+            user_id: match row.get("user_id") {
+                Some(user_id) => user_id,
+                None => None,
+            },
             channel: channel.into(),
             action: action.into(),
             data: data.into(),
@@ -235,6 +250,7 @@ enum BattleQueueDataAction {
     Ready,
     Unready,
     Start,
+    Watch,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -245,15 +261,17 @@ impl From<String> for BattleQueueDataAction {
             "ready" => BattleQueueDataAction::Ready,
             "unready" => BattleQueueDataAction::Unready,
             "start" => BattleQueueDataAction::Start,
+            "watch" => BattleQueueDataAction::Watch,
             _ => BattleQueueDataAction::Connect,
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct BattleQueueData {
     action: BattleQueueDataAction,
-    user_id: String,
+    user_id: Option<String>,
     opponent_id: Option<String>,
     mnstr_id: Option<String>,
     error: Option<String>,
@@ -263,7 +281,7 @@ struct BattleQueueData {
 impl BattleQueueData {
     fn new(
         action: BattleQueueDataAction,
-        user_id: String,
+        user_id: Option<String>,
         opponent_id: Option<String>,
         mnstr_id: Option<String>,
         error: Option<String>,
@@ -284,7 +302,7 @@ impl From<String> for BattleQueueData {
     fn from(value: String) -> Self {
         let data = serde_json::from_str(&value).unwrap_or(BattleQueueData {
             action: BattleQueueDataAction::Connect,
-            user_id: String::new(),
+            user_id: None,
             opponent_id: None,
             mnstr_id: None,
             error: Some("Invalid data".to_string()),
