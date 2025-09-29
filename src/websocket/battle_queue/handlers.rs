@@ -39,49 +39,21 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
     }
 
     Stream! { ws => {
+            // Check for valid session
             if let None = session {
-                let battle_queue_data = BattleQueueData::new(
-                    BattleQueueDataAction::Connect,
+                let battle_queue = build_error(
                     None,
                     user_name,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    Some("Invalid session".to_string()),
-                );
-                let battle_queue = BattleQueue::new(
-                    None,
                     BattleQueueChannel::Lobby,
                     BattleQueueAction::Error,
-                    battle_queue_data,
+                    BattleQueueDataAction::Connect,
+                    "Invalid session".to_string(),
                 );
                 yield serde_json::to_string(&battle_queue).unwrap().into();
                 return;
             }
 
-            let battle_queue_data = BattleQueueData::new(
-                BattleQueueDataAction::Connect,
-                Some(session.as_ref().unwrap().user_id.clone()),
-                user_name.clone(),
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some("In the battle queue".to_string()),
-            );
-
-            let battle_queue = BattleQueue::new(
-                Some(session.as_ref().unwrap().user_id.clone()),
-                BattleQueueChannel::Lobby,
-                BattleQueueAction::Joined,
-                battle_queue_data,
-            );
-
-            // yield serde_json::to_string(&battle_queue).unwrap().into();
-
+            // Open Redis connection
             let config = std::env::var("REDIS_URL").unwrap();
             let client = redis::Client::open(config).unwrap();
             let connection = match client.get_multiplexed_async_connection().await {
@@ -92,49 +64,63 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
                 }
             };
 
+            // Check for valid connection
             if let None = connection {
+                let battle_queue = build_error(
+                    Some(session.as_ref().unwrap().user_id.clone()),
+                    user_name.clone(),
+                    BattleQueueChannel::Lobby,
+                    BattleQueueAction::Error,
+                    BattleQueueDataAction::Connect,
+                    "Error getting connection".to_string(),
+                );
+                yield serde_json::to_string(&battle_queue).unwrap().into();
                 return;
             }
 
+            // Get Redis connection
             let mut connection = connection.unwrap();
 
+            // Subscribe to battle queue
             let mut pubsub = client.get_async_pubsub().await.unwrap();
             pubsub.subscribe("battle_queue").await.unwrap();
 
             let mut pubsub_stream = pubsub.into_on_message();
             let (tx, mut rx) = rocket::tokio::sync::mpsc::unbounded_channel::<String>();
 
+            // Insert battle status
             match insert_resource!(BattleStatus, vec![
                 ("user_id", session.as_ref().unwrap().user_id.clone().into()),
                 ("status", BattleStatusState::InQueue.to_string().into()),
                 ("connected", true.into()),
             ]).await {
                 Ok(_) => {
+                    // Publish battle queue
+                    let battle_queue = build_success(
+                        Some(session.as_ref().unwrap().user_id.clone()),
+                        user_name.clone(),
+                        BattleQueueChannel::Lobby,
+                        BattleQueueAction::Joined,
+                        BattleQueueDataAction::Connect,
+                        "In the battle queue".to_string(),
+                    );
                     connection.publish("battle_queue", serde_json::to_string(&battle_queue).unwrap()).await.unwrap();
                 }
                 Err(err) => {
                     println!("[battle_queue] Error inserting battle status: {:?}", err);
-                    let battle_queue_data = BattleQueueData::new(
-                        BattleQueueDataAction::Connect,
+                    let battle_queue = build_error(
                         Some(session.as_ref().unwrap().user_id.clone()),
                         user_name.clone(),
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        Some("Error updating battle status".to_string()),
-                    );
-                    let battle_queue = BattleQueue::new(
-                        Some(session.as_ref().unwrap().user_id.clone()),
                         BattleQueueChannel::Lobby,
                         BattleQueueAction::Error,
-                        battle_queue_data,
+                        BattleQueueDataAction::Connect,
+                        "Error updating battle status".to_string(),
                     );
                     connection.publish("battle_queue", serde_json::to_string(&battle_queue).unwrap()).await.unwrap();
                 }
             }
 
+            // Ping connection: this prevents redis timeouts
             let mut ping_connection = connection.clone();
             rocket::tokio::spawn(async move {
                 loop {
@@ -143,6 +129,7 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
                 }
             });
 
+            // Watch for messages from the battle queue and clients
             let session_clone = session.clone();
             let user_name = user_name.clone();
             rocket::tokio::spawn(async move {
@@ -159,6 +146,7 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
                 }
             });
 
+            // React to incoming messages from the battle queue and clients
             let mut ws = ws;
             loop {
                 rocket::tokio::select! {
@@ -173,28 +161,22 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
                     maybe_message = ws.next() => {
                         match maybe_message {
                             Some(message) => {
+                                // Build battle queue
                                 let queue = match build_battle_queue(message) {
                                     Ok(queue) => Some(queue),
                                     Err(err) => {
                                         println!("[battle_queue_handler] Error building battle queue: {:?}", err);
-                                        let battle_queue_data = BattleQueueData::new(
-                                            BattleQueueDataAction::Left,
+                                        // Build error
+                                        let battle_queue = build_error(
                                             Some(session_clone.as_ref().unwrap().user_id.clone()),
                                             user_name.clone(),
-                                            None,
-                                            None,
-                                            None,
-                                            None,
-                                            None,
-                                            Some("Player left the battle queue".to_string()),
-                                        );
-                                        let battle_queue = BattleQueue::new(
-                                            Some(session_clone.as_ref().unwrap().user_id.clone()),
                                             BattleQueueChannel::Lobby,
                                             BattleQueueAction::Left,
-                                            battle_queue_data,
+                                            BattleQueueDataAction::Left,
+                                            "Player left the battle queue".to_string(),
                                         );
                                         connection.publish("battle_queue", serde_json::to_string(&battle_queue).unwrap()).await.unwrap();
+                                        // Delete battle status
                                         match delete_resource_where_fields!(BattleStatus, vec![("user_id", session_clone.as_ref().unwrap().user_id.clone().into())]).await {
                                             Ok(_) => {
                                                 println!("[battle_queue_handler] Battle status deleted");
@@ -203,11 +185,13 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
                                                 println!("[battle_queue_handler] Error deleting battle status: {:?}", err);
                                             }
                                         };
+                                        // Publish battle queue
                                         connection.publish("battle_queue", serde_json::to_string(&battle_queue).unwrap()).await.unwrap();
                                         None
                                     }
                                 };
                                 if let Some(queue) = queue {
+                                    // Publish battle queue
                                     connection.publish("battle_queue", serde_json::to_string(&queue).unwrap()).await.unwrap();
                                 }
                             },
@@ -237,17 +221,48 @@ fn build_battle_queue(message: Result<rocket_ws::Message, Error>) -> Result<Batt
     Ok(queue)
 }
 
-fn handle_message(queue: &BattleQueue) -> Result<rocket_ws::Message, Error> {
-    let queue_str = match serde_json::to_string(queue) {
-        Ok(queue_str) => Some(queue_str),
-        Err(err) => {
-            println!(
-                "[handle_message] Error converting message to string: {:?}",
-                err
-            );
-            None
-        }
-    };
-    let new_message = Message::from(queue_str.unwrap());
-    Ok(new_message)
+fn build_error(
+    user_id: Option<String>,
+    user_name: Option<String>,
+    channel: BattleQueueChannel,
+    action: BattleQueueAction,
+    data_action: BattleQueueDataAction,
+    error: String,
+) -> BattleQueue {
+    let battle_queue_data = BattleQueueData::new(
+        data_action,
+        user_id.clone(),
+        user_name,
+        None,
+        None,
+        None,
+        None,
+        Some(error),
+        None,
+    );
+    let battle_queue = BattleQueue::new(user_id, channel, action, battle_queue_data);
+    battle_queue
+}
+
+fn build_success(
+    user_id: Option<String>,
+    user_name: Option<String>,
+    channel: BattleQueueChannel,
+    action: BattleQueueAction,
+    data_action: BattleQueueDataAction,
+    message: String,
+) -> BattleQueue {
+    let battle_queue_data = BattleQueueData::new(
+        data_action,
+        user_id.clone(),
+        user_name,
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some(message),
+    );
+    let battle_queue = BattleQueue::new(user_id, channel, action, battle_queue_data);
+    battle_queue
 }
