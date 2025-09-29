@@ -1,75 +1,15 @@
-use rocket_ws::{Config, Stream, WebSocket};
 use serde::{Deserialize, Serialize};
-use sqlx::{Error, Postgres, Row, postgres::PgRow};
+use sqlx::{Error, Row, postgres::PgRow};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
     database::traits::DatabaseResource,
-    utils::{
-        time::{deserialize_offset_date_time, serialize_offset_date_time},
-        token::RawToken,
-    },
-    websocket::helpers::verify_session_token,
+    utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
 
-#[get("/battle_queue")]
-pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
-    let ws = ws.config(Config::default());
-    let session = match verify_session_token(token).await {
-        Ok(session) => Some(session),
-        Err(err) => {
-            println!("Invalid session: {:?}", err);
-            None
-        }
-    };
-
-    Stream! { ws =>
-        if let None = session {
-            let battle_queue_data = BattleQueueData::new(
-                BattleQueueDataAction::Connect,
-                None,
-                None,
-                None,
-                None,
-                Some("Invalid session".to_string()),
-            );
-            let battle_queue = BattleQueue::new(
-                None,
-                BattleQueueChannel::Lobby,
-                BattleQueueAction::Error,
-                battle_queue_data,
-            );
-            yield serde_json::to_string(&battle_queue).unwrap().into();
-            return;
-        }
-
-        let battle_queue_data = BattleQueueData::new(
-            BattleQueueDataAction::Connect,
-            Some(session.as_ref().unwrap().user_id.clone()),
-            None,
-            None,
-            None,
-            Some("In the battle queue".to_string()),
-        );
-
-        let battle_queue = BattleQueue::new(
-            Some(session.as_ref().unwrap().user_id.clone()),
-            BattleQueueChannel::Lobby,
-            BattleQueueAction::Joined,
-            battle_queue_data,
-        );
-        println!("Battle queue: {:?}", battle_queue);
-        yield serde_json::to_string(&battle_queue).unwrap().into();
-
-        for await message in ws {
-            yield message?;
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
-enum BattleQueueChannel {
+pub enum BattleQueueChannel {
     Lobby,
     Battle,
 }
@@ -94,7 +34,7 @@ impl From<String> for BattleQueueChannel {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-enum BattleQueueAction {
+pub enum BattleQueueAction {
     Error,
     Joined,
     Left,
@@ -144,12 +84,12 @@ impl From<String> for BattleQueueAction {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct BattleQueue {
-    id: String,
-    user_id: Option<String>,
-    channel: BattleQueueChannel,
-    action: BattleQueueAction,
-    data: BattleQueueData,
+pub struct BattleQueue {
+    pub id: String,
+    pub user_id: Option<String>,
+    pub channel: BattleQueueChannel,
+    pub action: BattleQueueAction,
+    pub data: BattleQueueData,
 
     #[serde(
         serialize_with = "serialize_offset_date_time",
@@ -171,7 +111,7 @@ struct BattleQueue {
 }
 
 impl BattleQueue {
-    fn new(
+    pub fn new(
         user_id: Option<String>,
         channel: BattleQueueChannel,
         action: BattleQueueAction,
@@ -244,7 +184,7 @@ impl DatabaseResource for BattleQueue {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-enum BattleQueueDataAction {
+pub enum BattleQueueDataAction {
     Connect,
     Cancel,
     Ready,
@@ -269,29 +209,38 @@ impl From<String> for BattleQueueDataAction {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct BattleQueueData {
-    action: BattleQueueDataAction,
-    user_id: Option<String>,
-    opponent_id: Option<String>,
-    mnstr_id: Option<String>,
-    error: Option<String>,
-    message: Option<String>,
+pub struct BattleQueueData {
+    pub action: BattleQueueDataAction,
+    pub user_id: Option<String>,
+    pub user_name: Option<String>,
+    pub opponent_id: Option<String>,
+    pub opponent_name: Option<String>,
+    pub mnstr_id: Option<String>,
+    pub data: Option<String>,
+    pub error: Option<String>,
+    pub message: Option<String>,
 }
 
 impl BattleQueueData {
-    fn new(
+    pub fn new(
         action: BattleQueueDataAction,
         user_id: Option<String>,
+        user_name: Option<String>,
         opponent_id: Option<String>,
+        opponent_name: Option<String>,
         mnstr_id: Option<String>,
+        data: Option<String>,
         error: Option<String>,
         message: Option<String>,
     ) -> Self {
         Self {
             action,
             user_id,
+            user_name,
             opponent_id,
+            opponent_name,
             mnstr_id,
+            data,
             error,
             message,
         }
@@ -303,8 +252,11 @@ impl From<String> for BattleQueueData {
         let data = serde_json::from_str(&value).unwrap_or(BattleQueueData {
             action: BattleQueueDataAction::Connect,
             user_id: None,
+            user_name: None,
             opponent_id: None,
+            opponent_name: None,
             mnstr_id: None,
+            data: None,
             error: Some("Invalid data".to_string()),
             message: None,
         });

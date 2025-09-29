@@ -4,5 +4,5 @@ pub mod battle_queue;
 pub mod helpers;
 
 pub fn routes() -> Vec<Route> {
-    routes![battle_queue::battle_queue]
+    routes![battle_queue::handlers::battle_queue]
 }

@@ -35,3 +35,10 @@ twilio = "1.1.0"
 sendgrid = "0.24.1"
 rocket_ws = "0.1.1"
 static-files = "0.3.1"
+formatjson = "0.3.1"
+redis = { features = [
+    "tls-rustls",
+    "tokio-rustls-comp",
+], git = "https://github.com/redis-rs/redis-rs.git", rev = "70552b0aa05078697869349e244dcf9644645d0b" }
+tokio = { version = "1.47.1", features = ["sync"] }
+futures-util = "0.3.31"
