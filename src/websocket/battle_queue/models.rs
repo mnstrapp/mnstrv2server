@@ -1,3 +1,4 @@
+use rocket::serde;
 use serde::{Deserialize, Serialize};
 use sqlx::{Error, Row, postgres::PgRow};
 use time::OffsetDateTime;
@@ -191,6 +192,7 @@ pub enum BattleQueueDataAction {
     Unready,
     Start,
     Watch,
+    Left,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -202,6 +204,7 @@ impl From<String> for BattleQueueDataAction {
             "unready" => BattleQueueDataAction::Unready,
             "start" => BattleQueueDataAction::Start,
             "watch" => BattleQueueDataAction::Watch,
+            "left" => BattleQueueDataAction::Left,
             _ => BattleQueueDataAction::Connect,
         }
     }
@@ -261,5 +264,95 @@ impl From<String> for BattleQueueData {
             message: None,
         });
         data
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum BattleStatusState {
+    InQueue,
+    InBattle,
+    Watching,
+}
+
+impl std::fmt::Display for BattleStatusState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BattleStatusState::InQueue => write!(f, "inQueue"),
+            BattleStatusState::InBattle => write!(f, "inBattle"),
+            BattleStatusState::Watching => write!(f, "watching"),
+        }
+    }
+}
+
+impl From<String> for BattleStatusState {
+    fn from(value: String) -> Self {
+        match value.to_lowercase().as_str() {
+            "inQueue" => BattleStatusState::InQueue,
+            "inBattle" => BattleStatusState::InBattle,
+            "watching" => BattleStatusState::Watching,
+            _ => BattleStatusState::InQueue,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BattleStatus {
+    pub id: String,
+    pub user_id: String,
+    pub status: BattleStatusState,
+    pub connected: bool,
+
+    #[serde(
+        serialize_with = "serialize_offset_date_time",
+        deserialize_with = "deserialize_offset_date_time"
+    )]
+    pub created_at: Option<OffsetDateTime>,
+}
+
+impl BattleStatus {
+    pub fn new(user_id: String, status: BattleStatusState, connected: bool) -> Self {
+        let created_at = OffsetDateTime::now_utc();
+
+        Self {
+            id: Uuid::new_v4().to_string(),
+            user_id,
+            status,
+            connected,
+            created_at: Some(created_at),
+        }
+    }
+}
+
+impl DatabaseResource for BattleStatus {
+    fn from_row(row: &PgRow) -> Result<Self, Error> {
+        let created_at = row.get("created_at");
+
+        Ok(BattleStatus {
+            id: row.get("id"),
+            user_id: row.get("user_id"),
+            status: row.get::<String, _>("status").into(),
+            connected: row.get("connected"),
+            created_at: Some(created_at),
+        })
+    }
+
+    fn has_id() -> bool {
+        true
+    }
+    fn is_archivable() -> bool {
+        false
+    }
+    fn is_updatable() -> bool {
+        false
+    }
+    fn is_creatable() -> bool {
+        true
+    }
+    fn is_expirable() -> bool {
+        false
+    }
+    fn is_verifiable() -> bool {
+        false
     }
 }
