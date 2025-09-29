@@ -46,6 +46,7 @@ pub enum BattleQueueAction {
     Rejected,
     Cancelled,
     Watching,
+    List,
 }
 
 impl std::fmt::Display for BattleQueueAction {
@@ -61,6 +62,7 @@ impl std::fmt::Display for BattleQueueAction {
             BattleQueueAction::Rejected => write!(f, "rejected"),
             BattleQueueAction::Cancelled => write!(f, "cancelled"),
             BattleQueueAction::Watching => write!(f, "watching"),
+            BattleQueueAction::List => write!(f, "list"),
         }
     }
 }
@@ -78,6 +80,7 @@ impl From<String> for BattleQueueAction {
             "rejected" => BattleQueueAction::Rejected,
             "cancelled" => BattleQueueAction::Cancelled,
             "watching" => BattleQueueAction::Watching,
+            "list" => BattleQueueAction::List,
             _ => BattleQueueAction::Joined,
         }
     }
@@ -193,6 +196,7 @@ pub enum BattleQueueDataAction {
     Start,
     Watch,
     Left,
+    List,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -205,6 +209,7 @@ impl From<String> for BattleQueueDataAction {
             "start" => BattleQueueDataAction::Start,
             "watch" => BattleQueueDataAction::Watch,
             "left" => BattleQueueDataAction::Left,
+            "list" => BattleQueueDataAction::List,
             _ => BattleQueueDataAction::Connect,
         }
     }

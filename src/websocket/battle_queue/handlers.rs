@@ -3,7 +3,7 @@ use redis::AsyncTypedCommands;
 use rocket_ws::{Config, Message, Stream, WebSocket, result::Error};
 
 use crate::{
-    delete_resource_where_fields, insert_resource,
+    delete_resource_where_fields, find_all_resources_where_fields, insert_resource,
     models::user::User,
     utils::token::RawToken,
     websocket::{
@@ -54,8 +54,21 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
             }
 
             // Open Redis connection
-            let config = std::env::var("REDIS_URL").unwrap();
-            let client = redis::Client::open(config).unwrap();
+            let client = match connect_to_redis().await {
+                Ok(client) => client,
+                Err(err) => {
+                    println!("[redis] Error connecting to Redis: {:?}", err);
+                    yield serde_json::to_string(&build_error(
+                        Some(session.as_ref().unwrap().user_id.clone()),
+                        user_name.clone(),
+                        BattleQueueChannel::Lobby,
+                        BattleQueueAction::Error,
+                        BattleQueueDataAction::Connect,
+                        "Error connecting to Redis".to_string(),
+                    )).unwrap().into();
+                    return;
+                }
+            };
             let connection = match client.get_multiplexed_async_connection().await {
                 Ok(connection) => Some(connection),
                 Err(err) => {
@@ -91,6 +104,7 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
             // Insert battle status
             match insert_resource!(BattleStatus, vec![
                 ("user_id", session.as_ref().unwrap().user_id.clone().into()),
+                ("display_name", user_name.clone().unwrap().into()),
                 ("status", BattleStatusState::InQueue.to_string().into()),
                 ("connected", true.into()),
             ]).await {
@@ -125,7 +139,7 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
             rocket::tokio::spawn(async move {
                 loop {
                     ping_connection.ping().await.unwrap();
-                    rocket::tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    rocket::tokio::time::sleep(std::time::Duration::from_millis(300)).await;
                 }
             });
 
@@ -191,8 +205,39 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
                                     }
                                 };
                                 if let Some(queue) = queue {
-                                    // Publish battle queue
-                                    connection.publish("battle_queue", serde_json::to_string(&queue).unwrap()).await.unwrap();
+                                    match queue.data.action {
+                                        BattleQueueDataAction::List => {
+                                            let list = match find_all_resources_where_fields!(BattleStatus, vec![("status", BattleStatusState::InQueue.to_string().into())]).await {
+                                                Ok(list) => list,
+                                                Err(err) => {
+                                                    println!("[battle_queue_handler] Error getting list of players in the battle queue: {:?}", err);
+                                                    yield serde_json::to_string(&build_error(
+                                                        Some(session_clone.as_ref().unwrap().user_id.clone()),
+                                                        user_name.clone(),
+                                                        BattleQueueChannel::Lobby,
+                                                        BattleQueueAction::Error,
+                                                        BattleQueueDataAction::List,
+                                                        "Error getting list of players in the battle queue".to_string(),
+                                                    )).unwrap().into();
+                                                    return;
+                                                }
+                                            };
+                                            let mut battle_queue = build_success(
+                                                Some(session_clone.as_ref().unwrap().user_id.clone()),
+                                                user_name.clone(),
+                                                BattleQueueChannel::Lobby,
+                                                BattleQueueAction::List,
+                                                BattleQueueDataAction::List,
+                                                "List of players in the battle queue".to_string(),
+                                            );
+                                            battle_queue.data.data = Some(serde_json::to_string(&list).unwrap());
+                                            yield serde_json::to_string(&battle_queue).unwrap().into();
+                                        }
+                                        _ => {
+                                            // Publish battle queue
+                                            connection.publish("battle_queue", serde_json::to_string(&queue).unwrap()).await.unwrap();
+                                        }
+                                    }
                                 }
                             },
                             None => break,
@@ -265,4 +310,10 @@ fn build_success(
     );
     let battle_queue = BattleQueue::new(user_id, channel, action, battle_queue_data);
     battle_queue
+}
+
+async fn connect_to_redis() -> Result<redis::Client, Error> {
+    let config = std::env::var("REDIS_URL").unwrap();
+    let client = redis::Client::open(config).unwrap();
+    Ok(client)
 }
