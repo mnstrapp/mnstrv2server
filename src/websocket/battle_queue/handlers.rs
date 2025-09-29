@@ -209,8 +209,6 @@ fn build_battle_queue(message: Result<rocket_ws::Message, Error>) -> Result<Batt
 }
 
 fn handle_message(queue: &BattleQueue) -> Result<rocket_ws::Message, Error> {
-    println!("Queue: {:?}", queue.clone());
-
     let new_message = Message::from(serde_json::to_string(queue).unwrap());
     Ok(new_message)
 }
