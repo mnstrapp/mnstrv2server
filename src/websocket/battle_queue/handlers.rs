@@ -1,6 +1,6 @@
 use futures_util::StreamExt as _;
 use redis::AsyncTypedCommands;
-use rocket_ws::{Config, Message, Stream, WebSocket, result::Error};
+use rocket_ws::{Config, Stream, WebSocket, result::Error};
 
 use crate::{
     delete_resource_where_fields, find_all_resources_where_fields, insert_resource,
@@ -222,6 +222,12 @@ pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
                                                     return;
                                                 }
                                             };
+
+                                            let list: Vec<_> = list
+                                                .into_iter()
+                                                .filter(|item| item.user_id != session_clone.as_ref().unwrap().user_id)
+                                                .collect();
+
                                             let mut battle_queue = build_success(
                                                 Some(session_clone.as_ref().unwrap().user_id.clone()),
                                                 user_name.clone(),
@@ -255,11 +261,34 @@ fn build_battle_queue(message: Result<rocket_ws::Message, Error>) -> Result<Batt
         Err(err) => return Err(err),
     };
 
+    if message.is_empty() {
+        return Ok(build_error(
+            None,
+            None,
+            BattleQueueChannel::Lobby,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Error,
+            "Invalid message".to_string(),
+        ));
+    }
+
+    println!("[build_battle_queue] Message: {}", message);
+
     let queue: BattleQueue = match serde_json::from_str(&message) {
         Ok(queue) => queue,
         Err(err) => {
-            println!("[battle_queue] Error building battle queue: {:?}", err);
-            return Err(Error::ConnectionClosed);
+            println!(
+                "[build_battle_queue] Error building battle queue: {:?}",
+                err
+            );
+            return Ok(build_error(
+                None,
+                None,
+                BattleQueueChannel::Lobby,
+                BattleQueueAction::Error,
+                BattleQueueDataAction::Error,
+                "Invalid message".to_string(),
+            ));
         }
     };
 

@@ -197,6 +197,7 @@ pub enum BattleQueueDataAction {
     Watch,
     Left,
     List,
+    Error,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -210,6 +211,7 @@ impl From<String> for BattleQueueDataAction {
             "watch" => BattleQueueDataAction::Watch,
             "left" => BattleQueueDataAction::Left,
             "list" => BattleQueueDataAction::List,
+            "error" => BattleQueueDataAction::Error,
             _ => BattleQueueDataAction::Connect,
         }
     }
