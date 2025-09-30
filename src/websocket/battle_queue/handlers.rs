@@ -362,7 +362,6 @@ async fn handle_incoming_ws_message(
     user_name: &Option<String>,
 ) -> Option<String> {
     // Return early if message is empty
-    println!("[handle_incoming_ws_message] Message: {:?}", message);
     if let Ok(msg) = &message {
         if msg.is_empty() {
             return None;

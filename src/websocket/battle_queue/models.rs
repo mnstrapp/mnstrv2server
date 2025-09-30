@@ -50,7 +50,7 @@ pub enum BattleQueueAction {
     Challenge,
     Accept,
     Reject,
-    Start,
+    Ping,
 }
 
 impl std::fmt::Display for BattleQueueAction {
@@ -70,7 +70,7 @@ impl std::fmt::Display for BattleQueueAction {
             BattleQueueAction::Challenge => write!(f, "challenge"),
             BattleQueueAction::Accept => write!(f, "accept"),
             BattleQueueAction::Reject => write!(f, "reject"),
-            BattleQueueAction::Start => write!(f, "start"),
+            BattleQueueAction::Ping => write!(f, "ping"),
         }
     }
 }
@@ -92,7 +92,7 @@ impl From<String> for BattleQueueAction {
             "challenge" => BattleQueueAction::Challenge,
             "accept" => BattleQueueAction::Accept,
             "reject" => BattleQueueAction::Reject,
-            "start" => BattleQueueAction::Start,
+            "ping" => BattleQueueAction::Ping,
             _ => BattleQueueAction::Joined,
         }
     }
@@ -199,7 +199,7 @@ pub enum BattleQueueDataAction {
     Cancel,
     Ready,
     Unready,
-    Start,
+    Ping,
     Watch,
     Left,
     List,
@@ -207,6 +207,7 @@ pub enum BattleQueueDataAction {
     Challenge,
     Accept,
     Reject,
+    Start,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -224,7 +225,7 @@ impl From<String> for BattleQueueDataAction {
             "challenge" => BattleQueueDataAction::Challenge,
             "accept" => BattleQueueDataAction::Accept,
             "reject" => BattleQueueDataAction::Reject,
-            "start" => BattleQueueDataAction::Start,
+            "ping" => BattleQueueDataAction::Ping,
             _ => BattleQueueDataAction::Connect,
         }
     }
@@ -234,6 +235,7 @@ impl From<String> for BattleQueueDataAction {
 #[serde(rename_all = "camelCase")]
 pub struct BattleQueueData {
     pub action: BattleQueueDataAction,
+    pub id: Option<String>,
     pub user_id: Option<String>,
     pub user_name: Option<String>,
     pub opponent_id: Option<String>,
@@ -258,6 +260,7 @@ impl BattleQueueData {
     ) -> Self {
         Self {
             action,
+            id: Some(uuid::Uuid::new_v4().to_string()),
             user_id,
             user_name,
             opponent_id,
@@ -274,6 +277,7 @@ impl From<String> for BattleQueueData {
     fn from(value: String) -> Self {
         let data = serde_json::from_str(&value).unwrap_or(BattleQueueData {
             action: BattleQueueDataAction::Connect,
+            id: None,
             user_id: None,
             user_name: None,
             opponent_id: None,
