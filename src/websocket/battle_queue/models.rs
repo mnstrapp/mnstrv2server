@@ -44,9 +44,13 @@ pub enum BattleQueueAction {
     Requested,
     Accepted,
     Rejected,
-    Cancelled,
+    Cancel,
     Watching,
     List,
+    Challenge,
+    Accept,
+    Reject,
+    Start,
 }
 
 impl std::fmt::Display for BattleQueueAction {
@@ -60,9 +64,13 @@ impl std::fmt::Display for BattleQueueAction {
             BattleQueueAction::Requested => write!(f, "requested"),
             BattleQueueAction::Accepted => write!(f, "accepted"),
             BattleQueueAction::Rejected => write!(f, "rejected"),
-            BattleQueueAction::Cancelled => write!(f, "cancelled"),
+            BattleQueueAction::Cancel => write!(f, "cancel"),
             BattleQueueAction::Watching => write!(f, "watching"),
             BattleQueueAction::List => write!(f, "list"),
+            BattleQueueAction::Challenge => write!(f, "challenge"),
+            BattleQueueAction::Accept => write!(f, "accept"),
+            BattleQueueAction::Reject => write!(f, "reject"),
+            BattleQueueAction::Start => write!(f, "start"),
         }
     }
 }
@@ -78,9 +86,13 @@ impl From<String> for BattleQueueAction {
             "requested" => BattleQueueAction::Requested,
             "accepted" => BattleQueueAction::Accepted,
             "rejected" => BattleQueueAction::Rejected,
-            "cancelled" => BattleQueueAction::Cancelled,
+            "cancel" => BattleQueueAction::Cancel,
             "watching" => BattleQueueAction::Watching,
             "list" => BattleQueueAction::List,
+            "challenge" => BattleQueueAction::Challenge,
+            "accept" => BattleQueueAction::Accept,
+            "reject" => BattleQueueAction::Reject,
+            "start" => BattleQueueAction::Start,
             _ => BattleQueueAction::Joined,
         }
     }
@@ -192,6 +204,9 @@ pub enum BattleQueueDataAction {
     Left,
     List,
     Error,
+    Challenge,
+    Accept,
+    Reject,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -206,6 +221,10 @@ impl From<String> for BattleQueueDataAction {
             "left" => BattleQueueDataAction::Left,
             "list" => BattleQueueDataAction::List,
             "error" => BattleQueueDataAction::Error,
+            "challenge" => BattleQueueDataAction::Challenge,
+            "accept" => BattleQueueDataAction::Accept,
+            "reject" => BattleQueueDataAction::Reject,
+            "start" => BattleQueueDataAction::Start,
             _ => BattleQueueDataAction::Connect,
         }
     }
@@ -301,6 +320,7 @@ impl From<String> for BattleStatusState {
 pub struct BattleStatus {
     pub id: String,
     pub user_id: String,
+    pub display_name: String,
     pub status: BattleStatusState,
     pub connected: bool,
 
@@ -311,20 +331,6 @@ pub struct BattleStatus {
     pub created_at: Option<OffsetDateTime>,
 }
 
-impl BattleStatus {
-    pub fn new(user_id: String, status: BattleStatusState, connected: bool) -> Self {
-        let created_at = OffsetDateTime::now_utc();
-
-        Self {
-            id: Uuid::new_v4().to_string(),
-            user_id,
-            status,
-            connected,
-            created_at: Some(created_at),
-        }
-    }
-}
-
 impl DatabaseResource for BattleStatus {
     fn from_row(row: &PgRow) -> Result<Self, Error> {
         let created_at = row.get("created_at");
@@ -332,6 +338,7 @@ impl DatabaseResource for BattleStatus {
         Ok(BattleStatus {
             id: row.get("id"),
             user_id: row.get("user_id"),
+            display_name: row.get("display_name"),
             status: row.get::<String, _>("status").into(),
             connected: row.get("connected"),
             created_at: Some(created_at),
