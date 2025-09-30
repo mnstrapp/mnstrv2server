@@ -139,20 +139,14 @@ impl DatabaseResource for BattleQueue {
     fn from_row(row: &PgRow) -> Result<Self, Error> {
         let created_at = row.get("created_at");
         let updated_at = row.get("updated_at");
-        let archived_at = match row.get("archived_at") {
-            Some(archived_at) => archived_at,
-            None => None,
-        };
+        let archived_at: Option<OffsetDateTime> = row.get("archived_at");
         let channel = row.get::<String, _>("channel");
         let action = row.get::<String, _>("action");
         let data = row.get::<String, _>("data");
 
         Ok(BattleQueue {
             id: row.get("id"),
-            user_id: match row.get("user_id") {
-                Some(user_id) => user_id,
-                None => None,
-            },
+            user_id: row.get("user_id"),
             channel: channel.into(),
             action: action.into(),
             data: data.into(),
@@ -294,8 +288,8 @@ impl std::fmt::Display for BattleStatusState {
 impl From<String> for BattleStatusState {
     fn from(value: String) -> Self {
         match value.to_lowercase().as_str() {
-            "inQueue" => BattleStatusState::InQueue,
-            "inBattle" => BattleStatusState::InBattle,
+            "inqueue" => BattleStatusState::InQueue,
+            "inbattle" => BattleStatusState::InBattle,
             "watching" => BattleStatusState::Watching,
             _ => BattleStatusState::InQueue,
         }
