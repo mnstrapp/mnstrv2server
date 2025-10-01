@@ -334,16 +334,6 @@ async fn on_player_left(
     user_id: &String,
     user_name: &Option<String>,
 ) {
-    let battle_queue = build_error(
-        Some(user_id.clone()),
-        user_name.clone(),
-        BattleQueueChannel::Lobby,
-        BattleQueueAction::Left,
-        BattleQueueDataAction::Left,
-        "Player left the battle queue".to_string(),
-    );
-    publish_queue(connection, &battle_queue).await;
-
     // Best-effort cleanup of battle status
     match delete_resource_where_fields!(BattleStatus, vec![("user_id", user_id.clone().into())])
         .await
@@ -359,7 +349,15 @@ async fn on_player_left(
         }
     };
 
-    // Removed duplicate publish
+    let battle_queue = build_error(
+        Some(user_id.clone()),
+        user_name.clone(),
+        BattleQueueChannel::Lobby,
+        BattleQueueAction::Left,
+        BattleQueueDataAction::Left,
+        "Player left the battle queue".to_string(),
+    );
+    publish_queue(connection, &battle_queue).await;
 }
 
 // Extracted handler for incoming websocket messages
@@ -394,23 +392,44 @@ async fn handle_incoming_ws_message(
                     ),
                 }
             }
-            BattleQueueDataAction::Accept => match handle_accept_request(session_user_id).await {
-                Ok(_) => {
-                    publish_queue(connection, &queue).await;
-                    None
-                }
-                Err(_) => Some(
-                    serde_json::to_string(&build_error(
+            BattleQueueDataAction::Accept => {
+                let opponent_id = queue.data.opponent_id.clone().unwrap();
+                let opponent = match handle_accept_request(&opponent_id).await {
+                    Ok(_) => None,
+
+                    Err(_) => Some(build_error(
                         Some(session_user_id.clone()),
                         user_name.clone(),
                         BattleQueueChannel::Lobby,
                         BattleQueueAction::Error,
                         BattleQueueDataAction::Accept,
                         "Error accepting challenge".to_string(),
-                    ))
-                    .unwrap(),
-                ),
-            },
+                    )),
+                };
+                if let Some(opponent) = opponent {
+                    publish_queue(connection, &opponent).await;
+                    return None;
+                }
+
+                let challenger_id = queue.data.user_id.clone().unwrap();
+                let challenger = match handle_accept_request(&challenger_id).await {
+                    Ok(_) => None,
+                    Err(_) => Some(build_error(
+                        Some(session_user_id.clone()),
+                        user_name.clone(),
+                        BattleQueueChannel::Lobby,
+                        BattleQueueAction::Error,
+                        BattleQueueDataAction::Challenge,
+                        "Error challenging opponent".to_string(),
+                    )),
+                };
+                if let Some(challenger) = challenger {
+                    publish_queue(connection, &challenger).await;
+                    return None;
+                }
+                publish_queue(connection, &queue).await;
+                None
+            }
             BattleQueueDataAction::Ping => None,
             _ => {
                 publish_queue(connection, &queue).await;
