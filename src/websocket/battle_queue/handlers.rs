@@ -1,5 +1,6 @@
 use futures_util::StreamExt as _;
 use redis::AsyncTypedCommands;
+use rocket::error;
 use rocket_ws::{Config, Stream, WebSocket, result::Error};
 
 use crate::{
@@ -285,6 +286,7 @@ fn build_error(
         None,
         None,
         None,
+        None,
         Some(error),
         None,
     );
@@ -304,6 +306,7 @@ fn build_success(
         data_action,
         user_id.clone(),
         user_name,
+        None,
         None,
         None,
         None,
@@ -397,41 +400,19 @@ async fn handle_incoming_ws_message(
                 }
             }
             BattleQueueDataAction::Accept => {
-                let opponent_id = queue.data.opponent_id.clone().unwrap();
-                let opponent = match handle_accept_request(&opponent_id).await {
-                    Ok(_) => None,
-
-                    Err(_) => Some(build_error(
+                if let Err(_) =
+                    handle_accept_challenge(&queue, session_user_id, user_name, connection).await
+                {
+                    let error_queue = build_error(
                         Some(session_user_id.clone()),
                         user_name.clone(),
                         BattleQueueChannel::Lobby,
                         BattleQueueAction::Error,
                         BattleQueueDataAction::Accept,
                         "Error accepting challenge".to_string(),
-                    )),
-                };
-                if let Some(opponent) = opponent {
-                    publish_queue(connection, &opponent).await;
-                    return None;
+                    );
+                    publish_queue(connection, &error_queue).await;
                 }
-
-                let challenger_id = queue.data.user_id.clone().unwrap();
-                let challenger = match handle_accept_request(&challenger_id).await {
-                    Ok(_) => None,
-                    Err(_) => Some(build_error(
-                        Some(session_user_id.clone()),
-                        user_name.clone(),
-                        BattleQueueChannel::Lobby,
-                        BattleQueueAction::Error,
-                        BattleQueueDataAction::Challenge,
-                        "Error challenging opponent".to_string(),
-                    )),
-                };
-                if let Some(challenger) = challenger {
-                    publish_queue(connection, &challenger).await;
-                    return None;
-                }
-                publish_queue(connection, &queue).await;
                 None
             }
             BattleQueueDataAction::Ping => None,
@@ -479,6 +460,67 @@ async fn handle_list_request(
     );
     battle_queue.data.data = Some(serde_json::to_string(&list).unwrap());
     Ok(serde_json::to_string(&battle_queue).unwrap())
+}
+
+async fn handle_accept_challenge(
+    queue: &BattleQueue,
+    session_user_id: &String,
+    user_name: &Option<String>,
+    connection: &mut redis::aio::MultiplexedConnection,
+) -> Result<(), ()> {
+    let opponent_id = queue.data.opponent_id.clone().unwrap();
+    let error = match handle_accept_request(&opponent_id).await {
+        Ok(_) => None,
+
+        Err(_) => Some(build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Lobby,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Accept,
+            "Error accepting challenge".to_string(),
+        )),
+    };
+    if let Some(error) = error {
+        publish_queue(connection, &error).await;
+        return Err(());
+    }
+
+    let challenger_id = queue.data.user_id.clone().unwrap();
+    let error = match handle_accept_request(&challenger_id).await {
+        Ok(_) => None,
+        Err(_) => Some(build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Lobby,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Challenge,
+            "Error challenging opponent".to_string(),
+        )),
+    };
+    if let Some(error) = error {
+        publish_queue(connection, &error).await;
+        return Err(());
+    }
+
+    // let error = match create_battle(&challenger_id, &opponent_id).await {
+    //     Ok(_) => None,
+    //     Err(_) => Some(build_error(
+    //         Some(session_user_id.clone()),
+    //         user_name.clone(),
+    //         BattleQueueChannel::Lobby,
+    //         BattleQueueAction::Error,
+    //         BattleQueueDataAction::Challenge,
+    //         "Error creating battle".to_string(),
+    //     )),
+    // };
+    // if let Some(error) = error {
+    //     publish_queue(connection, &error).await;
+    //     return Err(());
+    // }
+
+    publish_queue(connection, &queue).await;
+    Ok(())
 }
 
 async fn handle_accept_request(requester_user_id: &String) -> Result<String, ()> {

@@ -1,13 +1,9 @@
 use rocket::serde;
 use serde::{Deserialize, Serialize};
-use sqlx::{Error, Row, postgres::PgRow};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{
-    database::traits::DatabaseResource,
-    utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
-};
+use crate::utils::time::{deserialize_offset_date_time, serialize_offset_date_time};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -53,6 +49,8 @@ pub enum BattleQueueAction {
     Accept,
     Reject,
     Ping,
+    GameStarted,
+    GameEnded,
 }
 
 impl std::fmt::Display for BattleQueueAction {
@@ -73,6 +71,8 @@ impl std::fmt::Display for BattleQueueAction {
             BattleQueueAction::Accept => write!(f, "accept"),
             BattleQueueAction::Reject => write!(f, "reject"),
             BattleQueueAction::Ping => write!(f, "ping"),
+            BattleQueueAction::GameStarted => write!(f, "gameStarted"),
+            BattleQueueAction::GameEnded => write!(f, "gameEnded"),
         }
     }
 }
@@ -95,6 +95,8 @@ impl From<String> for BattleQueueAction {
             "accept" => BattleQueueAction::Accept,
             "reject" => BattleQueueAction::Reject,
             "ping" => BattleQueueAction::Ping,
+            "gameStarted" => BattleQueueAction::GameStarted,
+            "gameEnded" => BattleQueueAction::GameEnded,
             _ => BattleQueueAction::Joined,
         }
     }
@@ -164,7 +166,8 @@ pub enum BattleQueueDataAction {
     Challenge,
     Accept,
     Reject,
-    Start,
+    GameStarted,
+    GameEnded,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -174,7 +177,6 @@ impl From<String> for BattleQueueDataAction {
             "cancel" => BattleQueueDataAction::Cancel,
             "ready" => BattleQueueDataAction::Ready,
             "unready" => BattleQueueDataAction::Unready,
-            "start" => BattleQueueDataAction::Start,
             "watch" => BattleQueueDataAction::Watch,
             "left" => BattleQueueDataAction::Left,
             "list" => BattleQueueDataAction::List,
@@ -183,6 +185,8 @@ impl From<String> for BattleQueueDataAction {
             "accept" => BattleQueueDataAction::Accept,
             "reject" => BattleQueueDataAction::Reject,
             "ping" => BattleQueueDataAction::Ping,
+            "gameStarted" => BattleQueueDataAction::GameStarted,
+            "gameEnded" => BattleQueueDataAction::GameEnded,
             _ => BattleQueueDataAction::Connect,
         }
     }
@@ -195,9 +199,10 @@ pub struct BattleQueueData {
     pub id: Option<String>,
     pub user_id: Option<String>,
     pub user_name: Option<String>,
+    pub user_mnstr_id: Option<String>,
     pub opponent_id: Option<String>,
     pub opponent_name: Option<String>,
-    pub mnstr_id: Option<String>,
+    pub opponent_mnstr_id: Option<String>,
     pub data: Option<String>,
     pub error: Option<String>,
     pub message: Option<String>,
@@ -210,7 +215,8 @@ impl BattleQueueData {
         user_name: Option<String>,
         opponent_id: Option<String>,
         opponent_name: Option<String>,
-        mnstr_id: Option<String>,
+        user_mnstr_id: Option<String>,
+        opponent_mnstr_id: Option<String>,
         data: Option<String>,
         error: Option<String>,
         message: Option<String>,
@@ -222,7 +228,8 @@ impl BattleQueueData {
             user_name,
             opponent_id,
             opponent_name,
-            mnstr_id,
+            user_mnstr_id,
+            opponent_mnstr_id,
             data,
             error,
             message,
@@ -237,9 +244,10 @@ impl From<String> for BattleQueueData {
             id: None,
             user_id: None,
             user_name: None,
+            user_mnstr_id: None,
             opponent_id: None,
             opponent_name: None,
-            mnstr_id: None,
+            opponent_mnstr_id: None,
             data: None,
             error: Some("Invalid data".to_string()),
             message: None,

@@ -4,7 +4,8 @@ use sqlx::{Error, Row, postgres::PgRow};
 use time::OffsetDateTime;
 
 use crate::{
-    database::traits::DatabaseResource,
+    database::{traits::DatabaseResource, values::DatabaseValue},
+    find_all_resources_where_fields, find_one_resource_where_fields, insert_resource,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
 
@@ -70,6 +71,79 @@ pub struct BattleLog {
         deserialize_with = "deserialize_offset_date_time"
     )]
     pub created_at: Option<OffsetDateTime>,
+}
+
+impl BattleLog {
+    pub fn new(
+        battle_id: String,
+        user_id: String,
+        mnstr_id: String,
+        action: BattleLogAction,
+        data: String,
+    ) -> Self {
+        Self {
+            id: "".to_string(),
+            battle_id,
+            user_id,
+            mnstr_id,
+            action,
+            data,
+            created_at: None,
+        }
+    }
+
+    pub async fn create(&mut self) -> Option<anyhow::Error> {
+        let params = vec![
+            ("id", uuid::Uuid::new_v4().to_string().into()),
+            ("battle_id", self.battle_id.clone().into()),
+            ("user_id", self.user_id.clone().into()),
+            ("mnstr_id", self.mnstr_id.clone().into()),
+            ("action", self.action.clone().to_string().into()),
+            ("data", self.data.clone().into()),
+        ];
+        let battle_log = match insert_resource!(BattleLog, params).await {
+            Ok(battle_log) => battle_log,
+            Err(e) => return Some(e.into()),
+        };
+        *self = battle_log;
+        None
+    }
+
+    pub async fn find_one(id: String) -> Result<Self, anyhow::Error> {
+        let battle_log =
+            match find_one_resource_where_fields!(BattleLog, vec![("id", id.clone().into())]).await
+            {
+                Ok(battle_log) => battle_log,
+                Err(e) => return Err(e.into()),
+            };
+        Ok(battle_log)
+    }
+
+    pub async fn find_one_by(params: Vec<(&str, DatabaseValue)>) -> Result<Self, anyhow::Error> {
+        let battle_log = match find_one_resource_where_fields!(BattleLog, params).await {
+            Ok(battle_log) => battle_log,
+            Err(e) => return Err(e.into()),
+        };
+        Ok(battle_log)
+    }
+
+    pub async fn find_all() -> Result<Vec<Self>, anyhow::Error> {
+        let battle_logs = match find_all_resources_where_fields!(BattleLog, vec![]).await {
+            Ok(battle_logs) => battle_logs,
+            Err(e) => return Err(e.into()),
+        };
+        Ok(battle_logs)
+    }
+
+    pub async fn find_all_by(
+        params: Vec<(&str, DatabaseValue)>,
+    ) -> Result<Vec<Self>, anyhow::Error> {
+        let battle_logs = match find_all_resources_where_fields!(BattleLog, params).await {
+            Ok(battle_logs) => battle_logs,
+            Err(e) => return Err(e.into()),
+        };
+        Ok(battle_logs)
+    }
 }
 
 impl DatabaseResource for BattleLog {
