@@ -5,13 +5,17 @@ use rocket_ws::{Config, Stream, WebSocket, result::Error};
 use crate::{
     delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
     insert_resource,
-    models::user::User,
+    models::{
+        battle::Battle,
+        battle_status::{BattleStatus, BattleStatusState},
+        user::User,
+    },
     update_resource,
     utils::token::RawToken,
     websocket::{
         battle_queue::models::{
             BattleQueue, BattleQueueAction, BattleQueueChannel, BattleQueueData,
-            BattleQueueDataAction, BattleStatus, BattleStatusState,
+            BattleQueueDataAction,
         },
         helpers::verify_session_token,
     },
@@ -452,21 +456,18 @@ async fn handle_list_request(
     requester_user_id: &String,
     user_name: &Option<String>,
 ) -> Result<String, ()> {
-    let list = find_all_resources_where_fields!(BattleStatus, vec![])
-        .await
-        .map_err(|_| ())?;
-
-    let list: Vec<_> = list
+    let list = BattleStatus::find_all().await.map_err(|_| ())?;
+    let list = list
         .into_iter()
         .filter(|item| item.user_id != *requester_user_id)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .fold(Vec::new(), |mut acc, item| {
-            if !acc.iter().any(|x: &BattleStatus| x.user_id == item.user_id) {
-                acc.push(item);
-            }
-            acc
-        });
+        .collect::<Vec<_>>();
+
+    let list = list.into_iter().fold(Vec::new(), |mut acc, item| {
+        if !acc.iter().any(|x: &BattleStatus| x.user_id == item.user_id) {
+            acc.push(item);
+        }
+        acc
+    });
 
     let mut battle_queue = build_success(
         Some(requester_user_id.clone()),
@@ -481,24 +482,36 @@ async fn handle_list_request(
 }
 
 async fn handle_accept_request(requester_user_id: &String) -> Result<String, ()> {
-    let status = find_one_resource_where_fields!(
-        BattleStatus,
-        vec![("user_id", requester_user_id.clone().into())]
-    )
-    .await
-    .map_err(|_| ())?;
-    let params = vec![
-        ("user_id", requester_user_id.clone().into()),
-        ("status", BattleStatusState::InBattle.to_string().into()),
-    ];
-    match update_resource!(BattleStatus, status.id, params).await {
-        Ok(status) => Ok(serde_json::to_string(&status).unwrap()),
-        Err(err) => {
-            println!(
-                "[handle_accept_request] Error updating battle status: {:?}",
-                err
-            );
-            Err(())
-        }
+    let mut status = BattleStatus::find_one_by(vec![("user_id", requester_user_id.clone().into())])
+        .await
+        .map_err(|_| ())?;
+    status.status = BattleStatusState::InBattle;
+    if let Some(error) = status.update().await {
+        println!(
+            "[handle_accept_request] Failed to update battle status: {:?}",
+            error
+        );
+        return Err(());
+    };
+    Ok(serde_json::to_string(&status).unwrap())
+}
+
+async fn create_battle(challenger_id: &String, opponent_id: &String) -> Result<String, ()> {
+    let challenger = User::find_one(challenger_id.clone(), false)
+        .await
+        .map_err(|_| ())?;
+    let opponent = User::find_one(opponent_id.clone(), false)
+        .await
+        .map_err(|_| ())?;
+    let mut battle = Battle::new(
+        challenger.id,
+        challenger.display_name,
+        opponent.id,
+        opponent.display_name,
+    );
+    if let Some(error) = battle.create().await {
+        println!("[create_battle] Failed to create battle: {:?}", error);
+        return Err(());
     }
+    Ok(serde_json::to_string(&battle).unwrap())
 }
