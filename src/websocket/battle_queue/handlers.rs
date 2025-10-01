@@ -415,7 +415,6 @@ async fn handle_incoming_ws_message(
                 }
                 None
             }
-            BattleQueueDataAction::Ping => None,
             _ => {
                 publish_queue(connection, &queue).await;
                 None
