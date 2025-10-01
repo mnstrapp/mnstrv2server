@@ -3,8 +3,10 @@ use redis::AsyncTypedCommands;
 use rocket_ws::{Config, Stream, WebSocket, result::Error};
 
 use crate::{
-    delete_resource_where_fields, find_all_resources_where_fields, insert_resource,
+    delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
+    insert_resource,
     models::user::User,
+    update_resource,
     utils::token::RawToken,
     websocket::{
         battle_queue::models::{
@@ -318,6 +320,12 @@ async fn connect_to_redis() -> Result<redis::Client, Error> {
 // Message handling helpers
 async fn publish_queue(connection: &mut redis::aio::MultiplexedConnection, queue: &BattleQueue) {
     let payload = serde_json::to_string(&queue).unwrap();
+    match queue.action {
+        BattleQueueAction::Ping => {}
+        _ => {
+            println!("[publish_queue] Queue: {:?}", payload);
+        }
+    }
     connection.publish("battle_queue", payload).await.unwrap();
 }
 
@@ -386,6 +394,24 @@ async fn handle_incoming_ws_message(
                     ),
                 }
             }
+            BattleQueueDataAction::Accept => match handle_accept_request(session_user_id).await {
+                Ok(_) => {
+                    publish_queue(connection, &queue).await;
+                    None
+                }
+                Err(_) => Some(
+                    serde_json::to_string(&build_error(
+                        Some(session_user_id.clone()),
+                        user_name.clone(),
+                        BattleQueueChannel::Lobby,
+                        BattleQueueAction::Error,
+                        BattleQueueDataAction::Accept,
+                        "Error accepting challenge".to_string(),
+                    ))
+                    .unwrap(),
+                ),
+            },
+            BattleQueueDataAction::Ping => None,
             _ => {
                 publish_queue(connection, &queue).await;
                 None
@@ -407,12 +433,9 @@ async fn handle_list_request(
     requester_user_id: &String,
     user_name: &Option<String>,
 ) -> Result<String, ()> {
-    let list = find_all_resources_where_fields!(
-        BattleStatus,
-        vec![("status", BattleStatusState::InQueue.to_string().into())]
-    )
-    .await
-    .map_err(|_| ())?;
+    let list = find_all_resources_where_fields!(BattleStatus, vec![])
+        .await
+        .map_err(|_| ())?;
 
     let list: Vec<_> = list
         .into_iter()
@@ -436,4 +459,27 @@ async fn handle_list_request(
     );
     battle_queue.data.data = Some(serde_json::to_string(&list).unwrap());
     Ok(serde_json::to_string(&battle_queue).unwrap())
+}
+
+async fn handle_accept_request(requester_user_id: &String) -> Result<String, ()> {
+    let status = find_one_resource_where_fields!(
+        BattleStatus,
+        vec![("user_id", requester_user_id.clone().into())]
+    )
+    .await
+    .map_err(|_| ())?;
+    let params = vec![
+        ("user_id", requester_user_id.clone().into()),
+        ("status", BattleStatusState::InBattle.to_string().into()),
+    ];
+    match update_resource!(BattleStatus, status.id, params).await {
+        Ok(status) => Ok(serde_json::to_string(&status).unwrap()),
+        Err(err) => {
+            println!(
+                "[handle_accept_request] Error updating battle status: {:?}",
+                err
+            );
+            Err(())
+        }
+    }
 }

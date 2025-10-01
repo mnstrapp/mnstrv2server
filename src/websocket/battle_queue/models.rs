@@ -10,6 +10,7 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum BattleQueueChannel {
     Lobby,
     Battle,
@@ -26,7 +27,7 @@ impl std::fmt::Display for BattleQueueChannel {
 
 impl From<String> for BattleQueueChannel {
     fn from(value: String) -> Self {
-        match value.to_lowercase().as_str() {
+        match value.as_str() {
             "lobby" => BattleQueueChannel::Lobby,
             "battle" => BattleQueueChannel::Battle,
             _ => BattleQueueChannel::Lobby,
@@ -35,6 +36,7 @@ impl From<String> for BattleQueueChannel {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum BattleQueueAction {
     Error,
     Joined,
@@ -77,7 +79,7 @@ impl std::fmt::Display for BattleQueueAction {
 
 impl From<String> for BattleQueueAction {
     fn from(value: String) -> Self {
-        match value.to_lowercase().as_str() {
+        match value.as_str() {
             "error" => BattleQueueAction::Error,
             "joined" => BattleQueueAction::Joined,
             "left" => BattleQueueAction::Left,
@@ -194,6 +196,7 @@ impl DatabaseResource for BattleQueue {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum BattleQueueDataAction {
     Connect,
     Cancel,
@@ -212,7 +215,7 @@ pub enum BattleQueueDataAction {
 
 impl From<String> for BattleQueueDataAction {
     fn from(value: String) -> Self {
-        match value.to_lowercase().as_str() {
+        match value.as_str() {
             "connect" => BattleQueueDataAction::Connect,
             "cancel" => BattleQueueDataAction::Cancel,
             "ready" => BattleQueueDataAction::Ready,
@@ -292,6 +295,7 @@ impl From<String> for BattleQueueData {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum BattleStatusState {
     InQueue,
     InBattle,
@@ -310,9 +314,9 @@ impl std::fmt::Display for BattleStatusState {
 
 impl From<String> for BattleStatusState {
     fn from(value: String) -> Self {
-        match value.to_lowercase().as_str() {
-            "inqueue" => BattleStatusState::InQueue,
-            "inbattle" => BattleStatusState::InBattle,
+        match value.as_str() {
+            "inQueue" => BattleStatusState::InQueue,
+            "inBattle" => BattleStatusState::InBattle,
             "watching" => BattleStatusState::Watching,
             _ => BattleStatusState::InQueue,
         }
