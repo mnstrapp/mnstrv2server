@@ -1,6 +1,6 @@
 use rocket::{
     Request,
-    request::{FromRequest, Outcome},
+    request::{FromParam, FromRequest, Outcome},
 };
 use serde::{Deserialize, Serialize};
 
@@ -29,5 +29,16 @@ impl<'r> FromRequest<'r> for RawToken {
                 })
                 .clone(),
         )
+    }
+}
+
+/// Implements Rocket's FromParam trait to extract the token from path parameters
+impl<'r> FromParam<'r> for RawToken {
+    type Error = ();
+
+    fn from_param(param: &'r str) -> Result<Self, Self::Error> {
+        Ok(RawToken {
+            value: param.to_string(),
+        })
     }
 }

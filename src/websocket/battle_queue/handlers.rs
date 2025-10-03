@@ -2,19 +2,16 @@ use std::collections::HashMap;
 
 use futures_util::StreamExt as _;
 use redis::AsyncTypedCommands;
-use rocket::error;
 use rocket_ws::{Config, Stream, WebSocket, result::Error};
 
 use crate::{
-    delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
-    insert_resource,
+    delete_resource_where_fields, insert_resource,
     models::{
         battle::Battle,
         battle_status::{BattleStatus, BattleStatusState},
         mnstr::Mnstr,
         user::User,
     },
-    update_resource,
     utils::token::RawToken,
     websocket::{
         battle_queue::models::{
@@ -25,7 +22,7 @@ use crate::{
     },
 };
 
-#[get("/battle_queue")]
+#[get("/battle_queue/<token>")]
 pub async fn battle_queue(ws: WebSocket, token: RawToken) -> Stream!['static] {
     let ws = ws.config(Config::default());
     let session = match verify_session_token(token).await {
