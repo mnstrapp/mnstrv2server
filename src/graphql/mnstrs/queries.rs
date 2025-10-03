@@ -9,8 +9,8 @@ impl MnstrQueryType {
         list(ctx).await
     }
 
-    async fn qr_code(ctx: &Ctx, qr_code: String) -> Result<Option<Mnstr>, FieldError> {
-        by_qr_code(ctx, qr_code).await
+    async fn qr_code(ctx: &Ctx, mnstr_qr_code: String) -> Result<Option<Mnstr>, FieldError> {
+        by_qr_code(ctx, mnstr_qr_code).await
     }
 }
 
@@ -29,7 +29,7 @@ async fn list(ctx: &Ctx) -> Result<Vec<Mnstr>, FieldError> {
     }
 }
 
-async fn by_qr_code(ctx: &Ctx, qr_code: String) -> Result<Option<Mnstr>, FieldError> {
+async fn by_qr_code(ctx: &Ctx, mnstr_qr_code: String) -> Result<Option<Mnstr>, FieldError> {
     if let None = ctx.session {
         return Err(FieldError::from("Invalid session"));
     }
@@ -37,7 +37,7 @@ async fn by_qr_code(ctx: &Ctx, qr_code: String) -> Result<Option<Mnstr>, FieldEr
 
     let params = vec![
         ("user_id", session.user_id.clone().into()),
-        ("mnstr_qr_code", qr_code.clone().into()),
+        ("mnstr_qr_code", mnstr_qr_code.clone().into()),
     ];
 
     match Mnstr::find_one_by(params, false).await {

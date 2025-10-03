@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use futures_util::StreamExt as _;
 use redis::AsyncTypedCommands;
 use rocket::error;
@@ -9,6 +11,7 @@ use crate::{
     models::{
         battle::Battle,
         battle_status::{BattleStatus, BattleStatusState},
+        mnstr::Mnstr,
         user::User,
     },
     update_resource,
@@ -16,7 +19,7 @@ use crate::{
     websocket::{
         battle_queue::models::{
             BattleQueue, BattleQueueAction, BattleQueueChannel, BattleQueueData,
-            BattleQueueDataAction,
+            BattleQueueDataAction, BattleQueueGameData,
         },
         helpers::verify_session_token,
     },
@@ -415,6 +418,29 @@ async fn handle_incoming_ws_message(
                 }
                 None
             }
+            BattleQueueDataAction::MnstrChosen => {
+                let battle_data: BattleQueueGameData =
+                    serde_json::from_str(&queue.data.data.clone().unwrap()).unwrap();
+                if let Some(_) = update_battle_mnstrs(
+                    &battle_data.battle_id.clone().unwrap(),
+                    &battle_data.challenger_mnstr.clone(),
+                    &battle_data.opponent_mnstr.clone(),
+                )
+                .await
+                {
+                    let error_queue = build_error(
+                        Some(session_user_id.clone()),
+                        user_name.clone(),
+                        BattleQueueChannel::Lobby,
+                        BattleQueueAction::Error,
+                        BattleQueueDataAction::MnstrChosen,
+                        "Error choosing mnstr".to_string(),
+                    );
+                    publish_queue(connection, &error_queue).await;
+                }
+                publish_queue(connection, &queue).await;
+                None
+            }
             _ => {
                 publish_queue(connection, &queue).await;
                 None
@@ -467,6 +493,7 @@ async fn handle_accept_challenge(
     user_name: &Option<String>,
     connection: &mut redis::aio::MultiplexedConnection,
 ) -> Result<(), ()> {
+    let mut queue = queue.clone();
     let opponent_id = queue.data.opponent_id.clone().unwrap();
     let error = match handle_accept_request(&opponent_id).await {
         Ok(_) => None,
@@ -502,21 +529,71 @@ async fn handle_accept_challenge(
         return Err(());
     }
 
-    // let error = match create_battle(&challenger_id, &opponent_id).await {
-    //     Ok(_) => None,
-    //     Err(_) => Some(build_error(
-    //         Some(session_user_id.clone()),
-    //         user_name.clone(),
-    //         BattleQueueChannel::Lobby,
-    //         BattleQueueAction::Error,
-    //         BattleQueueDataAction::Challenge,
-    //         "Error creating battle".to_string(),
-    //     )),
-    // };
-    // if let Some(error) = error {
-    //     publish_queue(connection, &error).await;
-    //     return Err(());
-    // }
+    let error = match create_battle(&challenger_id, &opponent_id).await {
+        Ok(_) => None,
+        Err(_) => Some(build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Lobby,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Challenge,
+            "Error creating battle".to_string(),
+        )),
+    };
+    if let Some(error) = error {
+        publish_queue(connection, &error).await;
+        return Err(());
+    }
+
+    let challenger_mnstrs = match load_mnstrs(&challenger_id).await {
+        Ok(mnstrs) => Some(mnstrs),
+        Err(_) => {
+            publish_queue(
+                connection,
+                &build_error(
+                    Some(session_user_id.clone()),
+                    user_name.clone(),
+                    BattleQueueChannel::Lobby,
+                    BattleQueueAction::Error,
+                    BattleQueueDataAction::Challenge,
+                    "Error loading mnstrs".to_string(),
+                ),
+            )
+            .await;
+            None
+        }
+    };
+
+    let opponent_mnstrs = match load_mnstrs(&opponent_id).await {
+        Ok(mnstrs) => Some(mnstrs),
+        Err(_) => {
+            publish_queue(
+                connection,
+                &build_error(
+                    Some(session_user_id.clone()),
+                    user_name.clone(),
+                    BattleQueueChannel::Lobby,
+                    BattleQueueAction::Error,
+                    BattleQueueDataAction::Challenge,
+                    "Error loading mnstrs".to_string(),
+                ),
+            )
+            .await;
+            None
+        }
+    };
+
+    let battle_queue_game_data_map = BattleQueueGameData {
+        battle_id: Some(uuid::Uuid::new_v4().to_string()),
+        challenger_mnstr: None,
+        opponent_mnstr: None,
+        challenger_mnstrs: challenger_mnstrs,
+        opponent_mnstrs: opponent_mnstrs,
+    };
+    let battle_queue_game_data = serde_json::to_string(&battle_queue_game_data_map).unwrap();
+    queue.data.data = Some(battle_queue_game_data);
+    queue.data.action = BattleQueueDataAction::GameStarted;
+    queue.action = BattleQueueAction::GameStarted;
 
     publish_queue(connection, &queue).await;
     Ok(())
@@ -555,4 +632,30 @@ async fn create_battle(challenger_id: &String, opponent_id: &String) -> Result<S
         return Err(());
     }
     Ok(serde_json::to_string(&battle).unwrap())
+}
+
+async fn update_battle_mnstrs(
+    battle_id: &String,
+    challenger_mnstr: &Option<Mnstr>,
+    opponent_mnstr: &Option<Mnstr>,
+) -> Option<anyhow::Error> {
+    let mut battle = Battle::find_one(battle_id.clone()).await.ok()?;
+    if let Some(challenger_mnstr) = challenger_mnstr {
+        battle.challenger_mnstr_id = Some(challenger_mnstr.id.clone());
+    }
+    if let Some(opponent_mnstr) = opponent_mnstr {
+        battle.opponent_mnstr_id = Some(opponent_mnstr.id.clone());
+    }
+    if let Some(error) = battle.update().await {
+        println!("[update_battle] Failed to update battle: {:?}", error);
+        return Some(error.into());
+    }
+    battle.update().await
+}
+
+async fn load_mnstrs(user_id: &String) -> Result<Vec<Mnstr>, ()> {
+    let mnstrs = Mnstr::find_all_by(vec![("user_id", user_id.clone().into())], false)
+        .await
+        .map_err(|_| ())?;
+    Ok(mnstrs)
 }

@@ -14,17 +14,12 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize, GraphQLObject, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Mnstr {
     pub id: String,
     pub user_id: String,
-
-    #[graphql(name = "name")]
     pub mnstr_name: String,
-
-    #[graphql(name = "description")]
     pub mnstr_description: String,
-
-    #[graphql(name = "qrCode")]
     pub mnstr_qr_code: String,
 
     #[serde(

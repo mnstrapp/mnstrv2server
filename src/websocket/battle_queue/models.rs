@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::utils::time::{deserialize_offset_date_time, serialize_offset_date_time};
+use crate::{
+    models::mnstr::Mnstr,
+    utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
+};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -51,6 +54,7 @@ pub enum BattleQueueAction {
     Ping,
     GameStarted,
     GameEnded,
+    MnstrChosen,
 }
 
 impl std::fmt::Display for BattleQueueAction {
@@ -73,6 +77,7 @@ impl std::fmt::Display for BattleQueueAction {
             BattleQueueAction::Ping => write!(f, "ping"),
             BattleQueueAction::GameStarted => write!(f, "gameStarted"),
             BattleQueueAction::GameEnded => write!(f, "gameEnded"),
+            BattleQueueAction::MnstrChosen => write!(f, "mnstrChosen"),
         }
     }
 }
@@ -168,6 +173,7 @@ pub enum BattleQueueDataAction {
     Reject,
     GameStarted,
     GameEnded,
+    MnstrChosen,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -187,6 +193,7 @@ impl From<String> for BattleQueueDataAction {
             "ping" => BattleQueueDataAction::Ping,
             "gameStarted" => BattleQueueDataAction::GameStarted,
             "gameEnded" => BattleQueueDataAction::GameEnded,
+            "mnstrChosen" => BattleQueueDataAction::MnstrChosen,
             _ => BattleQueueDataAction::Connect,
         }
     }
@@ -254,4 +261,14 @@ impl From<String> for BattleQueueData {
         });
         data
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BattleQueueGameData {
+    pub battle_id: Option<String>,
+    pub challenger_mnstr: Option<Mnstr>,
+    pub challenger_mnstrs: Option<Vec<Mnstr>>,
+    pub opponent_mnstr: Option<Mnstr>,
+    pub opponent_mnstrs: Option<Vec<Mnstr>>,
 }

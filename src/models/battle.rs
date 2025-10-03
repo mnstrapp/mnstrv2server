@@ -67,7 +67,6 @@ impl Battle {
 
     pub async fn create(&mut self) -> Option<anyhow::Error> {
         let params = vec![
-            ("id", uuid::Uuid::new_v4().to_string().into()),
             ("challenger_id", self.challenger_id.clone().into()),
             ("challenger_name", self.challenger_name.clone().into()),
             ("opponent_id", self.opponent_id.clone().into()),
