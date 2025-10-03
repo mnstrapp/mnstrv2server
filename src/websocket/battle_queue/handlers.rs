@@ -419,12 +419,13 @@ async fn handle_incoming_ws_message(
                 None
             }
             BattleQueueDataAction::MnstrChosen => {
-                let battle_data: BattleQueueGameData =
-                    serde_json::from_str(&queue.data.data.clone().unwrap()).unwrap();
+                let raw_game_data = queue.data.data.clone().unwrap();
+                let battle_game_data: BattleQueueGameData =
+                    serde_json::from_str(&raw_game_data.clone()).unwrap();
                 if let Some(_) = update_battle_mnstrs(
-                    &battle_data.battle_id.clone().unwrap(),
-                    &battle_data.challenger_mnstr.clone(),
-                    &battle_data.opponent_mnstr.clone(),
+                    &battle_game_data.battle_id.clone().unwrap(),
+                    &battle_game_data.challenger_mnstr.clone(),
+                    &battle_game_data.opponent_mnstr.clone(),
                 )
                 .await
                 {
@@ -529,24 +530,24 @@ async fn handle_accept_challenge(
         return Err(());
     }
 
-    let error = match create_battle(&challenger_id, &opponent_id).await {
-        Ok(_) => None,
-        Err(_) => Some(build_error(
-            Some(session_user_id.clone()),
-            user_name.clone(),
-            BattleQueueChannel::Lobby,
-            BattleQueueAction::Error,
-            BattleQueueDataAction::Challenge,
-            "Error creating battle".to_string(),
-        )),
+    let battle = match create_battle(&challenger_id, &opponent_id).await {
+        Ok(battle) => battle,
+        Err(_) => {
+            let error = build_error(
+                Some(session_user_id.clone()),
+                user_name.clone(),
+                BattleQueueChannel::Lobby,
+                BattleQueueAction::Error,
+                BattleQueueDataAction::Challenge,
+                "Error creating battle".to_string(),
+            );
+            publish_queue(connection, &error).await;
+            return Err(());
+        }
     };
-    if let Some(error) = error {
-        publish_queue(connection, &error).await;
-        return Err(());
-    }
 
     let challenger_mnstrs = match load_mnstrs(&challenger_id).await {
-        Ok(mnstrs) => Some(mnstrs),
+        Ok(mnstrs) => mnstrs,
         Err(_) => {
             publish_queue(
                 connection,
@@ -560,12 +561,12 @@ async fn handle_accept_challenge(
                 ),
             )
             .await;
-            None
+            return Err(());
         }
     };
 
     let opponent_mnstrs = match load_mnstrs(&opponent_id).await {
-        Ok(mnstrs) => Some(mnstrs),
+        Ok(mnstrs) => mnstrs,
         Err(_) => {
             publish_queue(
                 connection,
@@ -579,16 +580,16 @@ async fn handle_accept_challenge(
                 ),
             )
             .await;
-            None
+            return Err(());
         }
     };
 
     let battle_queue_game_data_map = BattleQueueGameData {
-        battle_id: Some(uuid::Uuid::new_v4().to_string()),
+        battle_id: Some(battle.id.clone()),
         challenger_mnstr: None,
         opponent_mnstr: None,
-        challenger_mnstrs: challenger_mnstrs,
-        opponent_mnstrs: opponent_mnstrs,
+        challenger_mnstrs: Some(challenger_mnstrs),
+        opponent_mnstrs: Some(opponent_mnstrs),
     };
     let battle_queue_game_data = serde_json::to_string(&battle_queue_game_data_map).unwrap();
     queue.data.data = Some(battle_queue_game_data);
@@ -614,7 +615,7 @@ async fn handle_accept_request(requester_user_id: &String) -> Result<String, ()>
     Ok(serde_json::to_string(&status).unwrap())
 }
 
-async fn create_battle(challenger_id: &String, opponent_id: &String) -> Result<String, ()> {
+async fn create_battle(challenger_id: &String, opponent_id: &String) -> Result<Battle, ()> {
     let challenger = User::find_one(challenger_id.clone(), false)
         .await
         .map_err(|_| ())?;
@@ -631,7 +632,7 @@ async fn create_battle(challenger_id: &String, opponent_id: &String) -> Result<S
         println!("[create_battle] Failed to create battle: {:?}", error);
         return Err(());
     }
-    Ok(serde_json::to_string(&battle).unwrap())
+    Ok(battle)
 }
 
 async fn update_battle_mnstrs(
@@ -639,7 +640,17 @@ async fn update_battle_mnstrs(
     challenger_mnstr: &Option<Mnstr>,
     opponent_mnstr: &Option<Mnstr>,
 ) -> Option<anyhow::Error> {
+    println!("[update_battle_mnstrs] Battle id: {:?}", battle_id);
+    println!(
+        "[update_battle_mnstrs] Challenger mnstr: {:?}",
+        challenger_mnstr
+    );
+    println!(
+        "[update_battle_mnstrs] Opponent mnstr: {:?}",
+        opponent_mnstr
+    );
     let mut battle = Battle::find_one(battle_id.clone()).await.ok()?;
+    println!("[update_battle_mnstrs] Battle: {:?}", battle);
     if let Some(challenger_mnstr) = challenger_mnstr {
         battle.challenger_mnstr_id = Some(challenger_mnstr.id.clone());
     }
