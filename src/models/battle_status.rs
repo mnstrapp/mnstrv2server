@@ -48,7 +48,6 @@ pub struct BattleStatus {
     pub opponent_name: Option<String>,
     pub battle_id: Option<String>,
     pub status: BattleStatusState,
-    pub connected: bool,
 
     #[serde(
         serialize_with = "serialize_offset_date_time",
@@ -65,7 +64,6 @@ impl BattleStatus {
         opponent_name: Option<String>,
         battle_id: Option<String>,
         status: BattleStatusState,
-        connected: bool,
     ) -> Self {
         Self {
             id: "".to_string(),
@@ -75,7 +73,6 @@ impl BattleStatus {
             opponent_name,
             battle_id,
             status,
-            connected,
             created_at: None,
         }
     }
@@ -88,7 +85,6 @@ impl BattleStatus {
             ("opponent_name", self.opponent_name.clone().into()),
             ("battle_id", self.battle_id.clone().into()),
             ("status", self.status.clone().to_string().into()),
-            ("connected", self.connected.into()),
         ];
         let battle_status = match insert_resource!(BattleStatus, params).await {
             Ok(battle_status) => battle_status,
@@ -104,7 +100,6 @@ impl BattleStatus {
             ("opponent_name", self.opponent_name.clone().into()),
             ("battle_id", self.battle_id.clone().into()),
             ("status", self.status.clone().to_string().into()),
-            ("connected", self.connected.into()),
         ];
         let battle_status = match update_resource!(BattleStatus, self.id.clone(), params).await {
             Ok(battle_status) => battle_status,
@@ -173,7 +168,6 @@ impl DatabaseResource for BattleStatus {
             opponent_name: row.get("opponent_name"),
             battle_id: row.get("battle_id"),
             status: row.get::<String, _>("status").into(),
-            connected: row.get("connected"),
             created_at: Some(created_at),
         })
     }

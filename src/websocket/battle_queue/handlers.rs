@@ -200,7 +200,6 @@ async fn insert_initial_status_and_notify(
         None,
         None,
         BattleStatusState::InQueue,
-        true,
     );
     match battle_status.create().await {
         None => {
