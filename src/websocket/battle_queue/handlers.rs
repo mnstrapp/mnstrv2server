@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use futures_util::StreamExt as _;
 use redis::AsyncTypedCommands;
 use rocket_ws::{Config, Stream, WebSocket, result::Error};
@@ -382,7 +380,7 @@ async fn handle_incoming_ws_message(
     }
 
     match build_battle_queue(message) {
-        Ok(queue) => match queue.data.action {
+        Ok(mut queue) => match queue.data.action {
             BattleQueueDataAction::List => {
                 match handle_list_request(session_user_id, user_name).await {
                     Ok(payload) => Some(payload),
@@ -417,27 +415,78 @@ async fn handle_incoming_ws_message(
             }
             BattleQueueDataAction::MnstrChosen => {
                 let raw_game_data = queue.data.data.clone().unwrap();
-                let battle_game_data: BattleQueueGameData =
+                let mut battle_game_data: BattleQueueGameData =
                     serde_json::from_str(&raw_game_data.clone()).unwrap();
-                if let Some(_) = update_battle_mnstrs(
+                match update_battle_mnstrs(
                     &battle_game_data.battle_id.clone().unwrap(),
                     &battle_game_data.challenger_mnstr.clone(),
                     &battle_game_data.opponent_mnstr.clone(),
                 )
                 .await
                 {
-                    let error_queue = build_error(
-                        Some(session_user_id.clone()),
-                        user_name.clone(),
-                        BattleQueueChannel::Lobby,
-                        BattleQueueAction::Error,
-                        BattleQueueDataAction::MnstrChosen,
-                        "Error choosing mnstr".to_string(),
-                    );
-                    publish_queue(connection, &error_queue).await;
+                    Ok(battle) => {
+                        battle_game_data.battle_id = Some(battle.id.clone());
+                        if let Some(challenger_mnstr_id) = battle.challenger_mnstr_id {
+                            let challenger_mnstr =
+                                match Mnstr::find_one(challenger_mnstr_id, false).await {
+                                    Ok(mnstr) => mnstr,
+                                    Err(_) => {
+                                        let error_queue = build_error(
+                                            Some(session_user_id.clone()),
+                                            user_name.clone(),
+                                            BattleQueueChannel::Lobby,
+                                            BattleQueueAction::Error,
+                                            BattleQueueDataAction::MnstrChosen,
+                                            "Error finding challenger mnstr".to_string(),
+                                        );
+                                        publish_queue(connection, &error_queue).await;
+                                        return None;
+                                    }
+                                };
+                            battle_game_data.challenger_mnstr = Some(challenger_mnstr);
+                        }
+                        if let Some(opponent_mnstr_id) = battle.opponent_mnstr_id {
+                            let opponent_mnstr =
+                                match Mnstr::find_one(opponent_mnstr_id, false).await {
+                                    Ok(mnstr) => mnstr,
+                                    Err(_) => {
+                                        let error_queue = build_error(
+                                            Some(session_user_id.clone()),
+                                            user_name.clone(),
+                                            BattleQueueChannel::Lobby,
+                                            BattleQueueAction::Error,
+                                            BattleQueueDataAction::MnstrChosen,
+                                            "Error finding opponent mnstr".to_string(),
+                                        );
+                                        publish_queue(connection, &error_queue).await;
+                                        return None;
+                                    }
+                                };
+                            battle_game_data.opponent_mnstr = Some(opponent_mnstr);
+                        }
+                        queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
+                        if battle_game_data.challenger_mnstr.is_some()
+                            && battle_game_data.opponent_mnstr.is_some()
+                        {
+                            queue.data.action = BattleQueueDataAction::GameStarted;
+                            queue.action = BattleQueueAction::GameStarted;
+                        }
+                        publish_queue(connection, &queue).await;
+                        None
+                    }
+                    Err(error) => {
+                        let error_queue = build_error(
+                            Some(session_user_id.clone()),
+                            user_name.clone(),
+                            BattleQueueChannel::Lobby,
+                            BattleQueueAction::Error,
+                            BattleQueueDataAction::MnstrChosen,
+                            "Error choosing mnstr".to_string(),
+                        );
+                        publish_queue(connection, &error_queue).await;
+                        None
+                    }
                 }
-                publish_queue(connection, &queue).await;
-                None
             }
             _ => {
                 publish_queue(connection, &queue).await;
@@ -636,29 +685,39 @@ async fn update_battle_mnstrs(
     battle_id: &String,
     challenger_mnstr: &Option<Mnstr>,
     opponent_mnstr: &Option<Mnstr>,
-) -> Option<anyhow::Error> {
+) -> Result<Battle, anyhow::Error> {
     println!("[update_battle_mnstrs] Battle id: {:?}", battle_id);
-    println!(
-        "[update_battle_mnstrs] Challenger mnstr: {:?}",
-        challenger_mnstr
-    );
-    println!(
-        "[update_battle_mnstrs] Opponent mnstr: {:?}",
-        opponent_mnstr
-    );
-    let mut battle = Battle::find_one(battle_id.clone()).await.ok()?;
+
+    let mut battle = match Battle::find_one(battle_id.clone()).await {
+        Ok(battle) => battle,
+        Err(error) => {
+            println!("[update_battle_mnstrs] Failed to find battle: {:?}", error);
+            return Err(error.into());
+        }
+    };
     println!("[update_battle_mnstrs] Battle: {:?}", battle);
     if let Some(challenger_mnstr) = challenger_mnstr {
+        println!(
+            "[update_battle_mnstrs] Challenger mnstr: {:?}",
+            challenger_mnstr.id.clone()
+        );
         battle.challenger_mnstr_id = Some(challenger_mnstr.id.clone());
     }
     if let Some(opponent_mnstr) = opponent_mnstr {
+        println!(
+            "[update_battle_mnstrs] Opponent mnstr: {:?}",
+            opponent_mnstr.id.clone()
+        );
         battle.opponent_mnstr_id = Some(opponent_mnstr.id.clone());
     }
     if let Some(error) = battle.update().await {
         println!("[update_battle] Failed to update battle: {:?}", error);
-        return Some(error.into());
+        return Err(error.into());
     }
-    battle.update().await
+    match battle.update().await {
+        None => Ok(battle),
+        Some(error) => Err(error.into()),
+    }
 }
 
 async fn load_mnstrs(user_id: &String) -> Result<Vec<Mnstr>, ()> {
