@@ -44,6 +44,9 @@ pub struct BattleStatus {
     pub id: String,
     pub user_id: String,
     pub display_name: String,
+    pub opponent_id: Option<String>,
+    pub opponent_name: Option<String>,
+    pub battle_id: Option<String>,
     pub status: BattleStatusState,
     pub connected: bool,
 
@@ -58,6 +61,9 @@ impl BattleStatus {
     pub fn new(
         user_id: String,
         display_name: String,
+        opponent_id: Option<String>,
+        opponent_name: Option<String>,
+        battle_id: Option<String>,
         status: BattleStatusState,
         connected: bool,
     ) -> Self {
@@ -65,6 +71,9 @@ impl BattleStatus {
             id: "".to_string(),
             user_id,
             display_name,
+            opponent_id,
+            opponent_name,
+            battle_id,
             status,
             connected,
             created_at: None,
@@ -73,9 +82,11 @@ impl BattleStatus {
 
     pub async fn create(&mut self) -> Option<anyhow::Error> {
         let params = vec![
-            ("id", uuid::Uuid::new_v4().to_string().into()),
             ("user_id", self.user_id.clone().into()),
             ("display_name", self.display_name.clone().into()),
+            ("opponent_id", self.opponent_id.clone().into()),
+            ("opponent_name", self.opponent_name.clone().into()),
+            ("battle_id", self.battle_id.clone().into()),
             ("status", self.status.clone().to_string().into()),
             ("connected", self.connected.into()),
         ];
@@ -89,6 +100,9 @@ impl BattleStatus {
 
     pub async fn update(&mut self) -> Option<anyhow::Error> {
         let params = vec![
+            ("opponent_id", self.opponent_id.clone().into()),
+            ("opponent_name", self.opponent_name.clone().into()),
+            ("battle_id", self.battle_id.clone().into()),
             ("status", self.status.clone().to_string().into()),
             ("connected", self.connected.into()),
         ];
@@ -155,6 +169,9 @@ impl DatabaseResource for BattleStatus {
             id: row.get("id"),
             user_id: row.get("user_id"),
             display_name: row.get("display_name"),
+            opponent_id: row.get("opponent_id"),
+            opponent_name: row.get("opponent_name"),
+            battle_id: row.get("battle_id"),
             status: row.get::<String, _>("status").into(),
             connected: row.get("connected"),
             created_at: Some(created_at),

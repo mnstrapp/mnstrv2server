@@ -56,6 +56,8 @@ pub enum BattleQueueAction {
     GameEnded,
     MnstrChosen,
     InGameAction,
+    Rejoin,
+    Rejoined,
 }
 
 impl std::fmt::Display for BattleQueueAction {
@@ -80,6 +82,8 @@ impl std::fmt::Display for BattleQueueAction {
             BattleQueueAction::GameEnded => write!(f, "gameEnded"),
             BattleQueueAction::MnstrChosen => write!(f, "mnstrChosen"),
             BattleQueueAction::InGameAction => write!(f, "inGameAction"),
+            BattleQueueAction::Rejoin => write!(f, "rejoin"),
+            BattleQueueAction::Rejoined => write!(f, "rejoined"),
         }
     }
 }
@@ -105,6 +109,8 @@ impl From<String> for BattleQueueAction {
             "gameStarted" => BattleQueueAction::GameStarted,
             "gameEnded" => BattleQueueAction::GameEnded,
             "inGameAction" => BattleQueueAction::InGameAction,
+            "rejoin" => BattleQueueAction::Rejoin,
+            "rejoined" => BattleQueueAction::Rejoined,
             _ => BattleQueueAction::Joined,
         }
     }
@@ -178,6 +184,8 @@ pub enum BattleQueueDataAction {
     GameEnded,
     MnstrChosen,
     InGameAction,
+    Rejoin,
+    Rejoined,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -199,6 +207,8 @@ impl From<String> for BattleQueueDataAction {
             "gameEnded" => BattleQueueDataAction::GameEnded,
             "mnstrChosen" => BattleQueueDataAction::MnstrChosen,
             "inGameAction" => BattleQueueDataAction::InGameAction,
+            "rejoin" => BattleQueueDataAction::Rejoin,
+            "rejoined" => BattleQueueDataAction::Rejoined,
             _ => BattleQueueDataAction::Connect,
         }
     }
