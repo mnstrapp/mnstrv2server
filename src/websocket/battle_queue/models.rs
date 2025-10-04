@@ -55,6 +55,7 @@ pub enum BattleQueueAction {
     GameStarted,
     GameEnded,
     MnstrChosen,
+    InGameAction,
 }
 
 impl std::fmt::Display for BattleQueueAction {
@@ -78,6 +79,7 @@ impl std::fmt::Display for BattleQueueAction {
             BattleQueueAction::GameStarted => write!(f, "gameStarted"),
             BattleQueueAction::GameEnded => write!(f, "gameEnded"),
             BattleQueueAction::MnstrChosen => write!(f, "mnstrChosen"),
+            BattleQueueAction::InGameAction => write!(f, "inGameAction"),
         }
     }
 }
@@ -102,6 +104,7 @@ impl From<String> for BattleQueueAction {
             "ping" => BattleQueueAction::Ping,
             "gameStarted" => BattleQueueAction::GameStarted,
             "gameEnded" => BattleQueueAction::GameEnded,
+            "inGameAction" => BattleQueueAction::InGameAction,
             _ => BattleQueueAction::Joined,
         }
     }
@@ -174,6 +177,7 @@ pub enum BattleQueueDataAction {
     GameStarted,
     GameEnded,
     MnstrChosen,
+    InGameAction,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -194,6 +198,7 @@ impl From<String> for BattleQueueDataAction {
             "gameStarted" => BattleQueueDataAction::GameStarted,
             "gameEnded" => BattleQueueDataAction::GameEnded,
             "mnstrChosen" => BattleQueueDataAction::MnstrChosen,
+            "inGameAction" => BattleQueueDataAction::InGameAction,
             _ => BattleQueueDataAction::Connect,
         }
     }

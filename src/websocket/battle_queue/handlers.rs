@@ -474,7 +474,7 @@ async fn handle_incoming_ws_message(
                         publish_queue(connection, &queue).await;
                         None
                     }
-                    Err(error) => {
+                    Err(_) => {
                         let error_queue = build_error(
                             Some(session_user_id.clone()),
                             user_name.clone(),
@@ -488,6 +488,7 @@ async fn handle_incoming_ws_message(
                     }
                 }
             }
+            BattleQueueDataAction::InGameAction => None,
             _ => {
                 publish_queue(connection, &queue).await;
                 None
