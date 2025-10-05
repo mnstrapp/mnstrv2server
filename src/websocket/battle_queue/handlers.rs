@@ -509,8 +509,57 @@ async fn handle_incoming_ws_message(
                 let raw_game_data = queue.data.data.clone().unwrap();
                 let mut battle_game_data: BattleQueueGameData =
                     serde_json::from_str(&raw_game_data.clone()).unwrap();
-                match handle_rejoin_request(&battle_game_data.battle_id.clone().unwrap()).await {
+                println!(
+                    "[handle_rejoin_request] Battle game data: {:?}",
+                    battle_game_data
+                );
+                if let None = battle_game_data.battle_id {
+                    let error_queue = build_error(
+                        Some(session_user_id.clone()),
+                        user_name.clone(),
+                        BattleQueueChannel::Battle,
+                        BattleQueueAction::Error,
+                        BattleQueueDataAction::Rejoin,
+                        "Error rejoining battle".to_string(),
+                    );
+                    publish_queue(connection, &error_queue).await;
+                    return None;
+                }
+                let battle_id = battle_game_data.battle_id.clone().unwrap();
+                match handle_rejoin_request(&battle_id).await {
                     Ok(battle) => {
+                        let params = vec![
+                            ("user_id", session_user_id.clone().into()),
+                            ("status", BattleStatusState::InQueue.to_string().into()),
+                        ];
+                        let error = match BattleStatus::find_one_by(params).await {
+                            Ok(mut status) => {
+                                status.delete().await;
+                                None
+                            }
+                            Err(_) => {
+                                println!(
+                                    "[handle_rejoin_request] Error deleting old battle status"
+                                );
+                                Some(anyhow::Error::msg("Error deleting old battle status"))
+                            }
+                        };
+                        if let Some(_) = error {
+                            publish_queue(
+                                connection,
+                                &build_error(
+                                    Some(session_user_id.clone()),
+                                    user_name.clone(),
+                                    BattleQueueChannel::Battle,
+                                    BattleQueueAction::Error,
+                                    BattleQueueDataAction::Rejoin,
+                                    "Error deleting old battle status".to_string(),
+                                ),
+                            )
+                            .await;
+                            return None;
+                        }
+
                         let challenger_mnstr = match Mnstr::find_one(
                             battle.challenger_mnstr_id.clone().unwrap(),
                             false,
