@@ -58,6 +58,11 @@ pub enum BattleQueueAction {
     InGameAction,
     Rejoin,
     Rejoined,
+    Attack,
+    Defend,
+    Magic,
+    Escape,
+    UpdateMnstr,
 }
 
 impl std::fmt::Display for BattleQueueAction {
@@ -84,6 +89,11 @@ impl std::fmt::Display for BattleQueueAction {
             BattleQueueAction::InGameAction => write!(f, "inGameAction"),
             BattleQueueAction::Rejoin => write!(f, "rejoin"),
             BattleQueueAction::Rejoined => write!(f, "rejoined"),
+            BattleQueueAction::Attack => write!(f, "attack"),
+            BattleQueueAction::Defend => write!(f, "defend"),
+            BattleQueueAction::Magic => write!(f, "magic"),
+            BattleQueueAction::Escape => write!(f, "escape"),
+            BattleQueueAction::UpdateMnstr => write!(f, "updateMnstr"),
         }
     }
 }
@@ -111,6 +121,11 @@ impl From<String> for BattleQueueAction {
             "inGameAction" => BattleQueueAction::InGameAction,
             "rejoin" => BattleQueueAction::Rejoin,
             "rejoined" => BattleQueueAction::Rejoined,
+            "attack" => BattleQueueAction::Attack,
+            "defend" => BattleQueueAction::Defend,
+            "magic" => BattleQueueAction::Magic,
+            "escape" => BattleQueueAction::Escape,
+            "updateMnstr" => BattleQueueAction::UpdateMnstr,
             _ => BattleQueueAction::Joined,
         }
     }
@@ -186,6 +201,11 @@ pub enum BattleQueueDataAction {
     InGameAction,
     Rejoin,
     Rejoined,
+    Attack,
+    Defend,
+    Magic,
+    Escape,
+    UpdateMnstr,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -209,6 +229,11 @@ impl From<String> for BattleQueueDataAction {
             "inGameAction" => BattleQueueDataAction::InGameAction,
             "rejoin" => BattleQueueDataAction::Rejoin,
             "rejoined" => BattleQueueDataAction::Rejoined,
+            "attack" => BattleQueueDataAction::Attack,
+            "defend" => BattleQueueDataAction::Defend,
+            "magic" => BattleQueueDataAction::Magic,
+            "escape" => BattleQueueDataAction::Escape,
+            "updateMnstr" => BattleQueueDataAction::UpdateMnstr,
             _ => BattleQueueDataAction::Connect,
         }
     }
@@ -286,4 +311,5 @@ pub struct BattleQueueGameData {
     pub challenger_mnstrs: Option<Vec<Mnstr>>,
     pub opponent_mnstr: Option<Mnstr>,
     pub opponent_mnstrs: Option<Vec<Mnstr>>,
+    pub mnstr: Option<Mnstr>,
 }

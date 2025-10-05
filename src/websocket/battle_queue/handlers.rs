@@ -702,6 +702,7 @@ async fn handle_accept_challenge(
         opponent_mnstr: None,
         challenger_mnstrs: Some(challenger_mnstrs),
         opponent_mnstrs: Some(opponent_mnstrs),
+        mnstr: None,
     };
 
     let battle_queue_game_data = serde_json::to_string(&battle_queue_game_data_map).unwrap();

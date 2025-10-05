@@ -57,6 +57,8 @@ pub struct Mnstr {
     // Relationships
 }
 
+const DEFAULT_STAT_VALUE: i32 = 10;
+
 impl Mnstr {
     pub fn new(
         user_id: String,
@@ -75,18 +77,18 @@ impl Mnstr {
             archived_at: None,
             current_level: 0,
             current_experience: 0,
-            current_health: 0,
-            max_health: 0,
-            current_attack: 0,
-            max_attack: 0,
-            current_defense: 0,
-            max_defense: 0,
-            current_speed: 0,
-            max_speed: 0,
-            current_intelligence: 0,
-            max_intelligence: 0,
-            current_magic: 0,
-            max_magic: 0,
+            current_health: DEFAULT_STAT_VALUE,
+            max_health: DEFAULT_STAT_VALUE,
+            current_attack: DEFAULT_STAT_VALUE,
+            max_attack: DEFAULT_STAT_VALUE,
+            current_defense: DEFAULT_STAT_VALUE,
+            max_defense: DEFAULT_STAT_VALUE,
+            current_speed: DEFAULT_STAT_VALUE,
+            max_speed: DEFAULT_STAT_VALUE,
+            current_intelligence: DEFAULT_STAT_VALUE,
+            max_intelligence: DEFAULT_STAT_VALUE,
+            current_magic: DEFAULT_STAT_VALUE,
+            max_magic: DEFAULT_STAT_VALUE,
         }
     }
     pub fn copy_with(
@@ -237,6 +239,26 @@ impl Mnstr {
         None
     }
 
+    pub async fn update_with_defaults(&mut self) -> Option<anyhow::Error> {
+        println!(
+            "[Mnstr::update_with_defaults] Updating mnstr with defaults: {:?}",
+            self.id
+        );
+        self.current_health = DEFAULT_STAT_VALUE;
+        self.max_health = DEFAULT_STAT_VALUE;
+        self.current_attack = DEFAULT_STAT_VALUE;
+        self.max_attack = DEFAULT_STAT_VALUE;
+        self.current_defense = DEFAULT_STAT_VALUE;
+        self.max_defense = DEFAULT_STAT_VALUE;
+        self.current_speed = DEFAULT_STAT_VALUE;
+        self.max_speed = DEFAULT_STAT_VALUE;
+        self.current_intelligence = DEFAULT_STAT_VALUE;
+        self.max_intelligence = DEFAULT_STAT_VALUE;
+        self.current_magic = DEFAULT_STAT_VALUE;
+        self.max_magic = DEFAULT_STAT_VALUE;
+        self.update().await
+    }
+
     pub async fn delete_permanent(&mut self) -> Option<anyhow::Error> {
         match delete_resource_where_fields!(Mnstr, vec![("id", self.id.clone().into())], true).await
         {
@@ -255,6 +277,15 @@ impl Mnstr {
                     return Err(e.into());
                 }
             };
+        if mnstr.max_health == 0 {
+            if let Some(error) = mnstr.update_with_defaults().await {
+                println!(
+                    "[Mnstr::find_one] Failed to update with defaults: {:?}",
+                    error
+                );
+                return Err(error.into());
+            }
+        }
         if get_relationships {
             if let Some(error) = mnstr.get_relationships().await {
                 println!("[Mnstr::find_one] Failed to get relationships: {:?}", error);
@@ -275,6 +306,15 @@ impl Mnstr {
                 return Err(e.into());
             }
         };
+        if mnstr.max_health == 0 {
+            if let Some(error) = mnstr.update_with_defaults().await {
+                println!(
+                    "[Mnstr::find_one_by] Failed to update with defaults: {:?}",
+                    error
+                );
+                return Err(error.into());
+            }
+        }
         if get_relationships {
             if let Some(error) = mnstr.get_relationships().await {
                 println!("[Mnstr::find_one] Failed to get relationships: {:?}", error);
@@ -293,6 +333,15 @@ impl Mnstr {
             }
         };
         for mnstr in mnstrs.iter_mut() {
+            if mnstr.max_health == 0 {
+                if let Some(error) = mnstr.update_with_defaults().await {
+                    println!(
+                        "[Mnstr::find_all] Failed to update with defaults: {:?}",
+                        error
+                    );
+                    return Err(error.into());
+                }
+            }
             if get_relationships {
                 if let Some(error) = mnstr.get_relationships().await {
                     println!("[Mnstr::find_all] Failed to get relationships: {:?}", error);
@@ -315,6 +364,15 @@ impl Mnstr {
             }
         };
         for mnstr in mnstrs.iter_mut() {
+            if mnstr.max_health == 0 {
+                if let Some(error) = mnstr.update_with_defaults().await {
+                    println!(
+                        "[Mnstr::find_all_by] Failed to update with defaults: {:?}",
+                        error
+                    );
+                    return Err(error.into());
+                }
+            }
             if get_relationships {
                 if let Some(error) = mnstr.get_relationships().await {
                     println!(
