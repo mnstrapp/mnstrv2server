@@ -433,7 +433,7 @@ async fn handle_incoming_ws_message(
                     Ok(battle) => {
                         battle_game_data.battle_id = Some(battle.id.clone());
                         if let Some(challenger_mnstr_id) = battle.challenger_mnstr_id.clone() {
-                            let challenger_mnstr =
+                            let mut challenger_mnstr =
                                 match Mnstr::find_one(challenger_mnstr_id, false).await {
                                     Ok(mnstr) => mnstr,
                                     Err(_) => {
@@ -449,11 +449,24 @@ async fn handle_incoming_ws_message(
                                         return None;
                                     }
                                 };
+
+                            challenger_mnstr.current_attack = challenger_mnstr.max_attack;
+                            challenger_mnstr.current_defense = challenger_mnstr.max_defense;
+
+                            println!("[handle_incoming_ws_message] Updating challenger mnstr");
+                            if let Some(error) = challenger_mnstr.update().await {
+                                println!(
+                                    "[handle_incoming_ws_message] Error updating challenger mnstr: {:?}",
+                                    error
+                                );
+                                return None;
+                            }
+
                             battle_game_data.challenger_mnstr = Some(challenger_mnstr);
                             queue.data.user_id = Some(battle.challenger_id.clone());
                         }
                         if let Some(opponent_mnstr_id) = battle.opponent_mnstr_id.clone() {
-                            let opponent_mnstr =
+                            let mut opponent_mnstr =
                                 match Mnstr::find_one(opponent_mnstr_id, false).await {
                                     Ok(mnstr) => mnstr,
                                     Err(_) => {
@@ -469,6 +482,19 @@ async fn handle_incoming_ws_message(
                                         return None;
                                     }
                                 };
+
+                            opponent_mnstr.current_attack = opponent_mnstr.max_attack;
+                            opponent_mnstr.current_defense = opponent_mnstr.max_defense;
+
+                            println!("[handle_incoming_ws_message] Updating opponent mnstr");
+                            if let Some(error) = opponent_mnstr.update().await {
+                                println!(
+                                    "[handle_incoming_ws_message] Error updating opponent mnstr: {:?}",
+                                    error
+                                );
+                                return None;
+                            }
+
                             battle_game_data.opponent_mnstr = Some(opponent_mnstr);
                             queue.data.opponent_id = Some(battle.opponent_id.clone());
                         }
@@ -1053,31 +1079,6 @@ async fn handle_attack(
     attacker.current_speed -= 1;
     defender.current_defense -= 1;
     defender.current_intelligence -= 1;
-
-    println!(
-        "[handle_attack] Attacker current attack: {:?}",
-        attacker.current_attack
-    );
-    println!(
-        "[handle_attack] Attacker current speed: {:?}",
-        attacker.current_speed
-    );
-    println!(
-        "[handle_attack] Attacker current health: {:?}",
-        attacker.current_health
-    );
-    println!(
-        "[handle_attack] Attacker current intelligence: {:?}",
-        attacker.current_intelligence
-    );
-    println!(
-        "[handle_attack] Defender current defense: {:?}",
-        defender.current_defense
-    );
-    println!(
-        "[handle_attack] Defender current health: {:?}",
-        defender.current_health
-    );
 
     println!("[handle_attack] Updating attacker");
     if let Some(error) = attacker.update().await {
