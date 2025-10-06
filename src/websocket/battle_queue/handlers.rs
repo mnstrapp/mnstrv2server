@@ -1,4 +1,5 @@
 use futures_util::StreamExt as _;
+use rand::Rng;
 use redis::AsyncTypedCommands;
 use rocket_ws::{Config, Stream, WebSocket, result::Error};
 
@@ -6,6 +7,7 @@ use crate::{
     delete_resource_where_fields, insert_resource,
     models::{
         battle::Battle,
+        battle_log::{BattleLog, BattleLogAction},
         battle_status::{BattleStatus, BattleStatusState},
         generated::mnstr_xp::XP_FOR_LEVEL,
         mnstr::Mnstr,
@@ -14,7 +16,7 @@ use crate::{
     utils::token::RawToken,
     websocket::{
         battle_queue::models::{
-            BattleQueue, BattleQueueAction, BattleQueueChannel, BattleQueueData,
+            BattleLogData, BattleQueue, BattleQueueAction, BattleQueueChannel, BattleQueueData,
             BattleQueueDataAction, BattleQueueGameData,
         },
         helpers::verify_session_token,
@@ -468,8 +470,18 @@ async fn handle_incoming_ws_message(
                                     }
                                 };
                             battle_game_data.opponent_mnstr = Some(opponent_mnstr);
-                            queue.data.opponent_id = Some(battle.opponent_id);
+                            queue.data.opponent_id = Some(battle.opponent_id.clone());
                         }
+
+                        let coin_flip = rand::rng().random_range(0..2);
+                        let turn_user_id;
+                        if coin_flip == 0 {
+                            turn_user_id = battle.challenger_id.clone();
+                        } else {
+                            turn_user_id = battle.opponent_id.clone();
+                        }
+                        battle_game_data.turn_user_id = Some(turn_user_id);
+
                         queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
                         if battle.challenger_mnstr_id.is_some()
                             && battle.opponent_mnstr_id.is_some()
@@ -624,6 +636,17 @@ async fn handle_incoming_ws_message(
                 publish_queue(connection, &queue).await;
                 None
             }
+            BattleQueueDataAction::Attack => {
+                if let Some(error) = handle_attack(&mut queue, session_user_id, user_name).await {
+                    publish_queue(connection, &error).await;
+                    return None;
+                }
+                println!("[handle_attack] Publishing queue: {:?}", queue);
+                publish_queue(connection, &queue).await;
+                None
+            }
+            BattleQueueDataAction::Defend => None,
+            BattleQueueDataAction::Magic => None,
             _ => {
                 publish_queue(connection, &queue).await;
                 None
@@ -762,6 +785,14 @@ async fn handle_accept_challenge(
         }
     };
 
+    let coin_flip = rand::rng().random_range(0..2);
+    let turn_user_id;
+    if coin_flip == 0 {
+        turn_user_id = challenger_id.clone();
+    } else {
+        turn_user_id = opponent_id.clone();
+    }
+
     let battle_queue_game_data_map = BattleQueueGameData {
         battle_id: Some(battle.id.clone()),
         challenger_mnstr: None,
@@ -774,6 +805,7 @@ async fn handle_accept_challenge(
         winner_coins_awarded: None,
         loser_xp_awarded: None,
         loser_coins_awarded: None,
+        turn_user_id: Some(turn_user_id),
     };
 
     let battle_queue_game_data = serde_json::to_string(&battle_queue_game_data_map).unwrap();
@@ -921,7 +953,7 @@ async fn handle_rejoin_request(battle_id: &String) -> Result<Battle, ()> {
     Ok(battle)
 }
 
-async fn handle_left(session_user_id: &String, user_name: &Option<String>) -> Option<String> {
+async fn handle_left(session_user_id: &String) -> Option<String> {
     let mut status =
         match BattleStatus::find_one_by(vec![("user_id", session_user_id.clone().into())]).await {
             Ok(status) => status,
@@ -937,18 +969,157 @@ async fn handle_left(session_user_id: &String, user_name: &Option<String>) -> Op
     None
 }
 
-async fn handle_game_ended(
+async fn handle_attack(
     queue: &mut BattleQueue,
     session_user_id: &String,
     user_name: &Option<String>,
 ) -> Option<BattleQueue> {
-    if let Some(error) = handle_left(session_user_id, user_name).await {
+    let game_data = queue.data.data.clone().unwrap();
+    let mut battle_game_data: BattleQueueGameData =
+        serde_json::from_str(&game_data.clone()).unwrap();
+
+    let battle_id = battle_game_data.battle_id.clone().unwrap();
+    let challenger = battle_game_data.challenger_mnstr.clone().unwrap();
+    let opponent = battle_game_data.opponent_mnstr.clone().unwrap();
+    let turn_user_id = battle_game_data.turn_user_id.clone().unwrap();
+
+    let mut attacker;
+    let mut defender;
+    if turn_user_id == challenger.user_id {
+        attacker = opponent.clone();
+        defender = challenger.clone();
+    } else {
+        attacker = challenger.clone();
+        defender = opponent.clone();
+    }
+
+    let attacker_roll = roll_dice(20) + (attacker.current_speed / 20) as i32;
+    let defender_roll = roll_dice(20) + (defender.current_intelligence / 20) as i32;
+
+    let mut battle_log_data = BattleLogData {
+        missed: None,
+        hit: None,
+        damage: None,
+    };
+
+    let battle_log_action;
+
+    if attacker_roll > defender_roll {
+        let attack = attacker_roll;
+        if attack > defender.current_defense {
+            defender.current_health = 0;
+        } else {
+            defender.current_health -= attack;
+        }
+
+        battle_log_data.hit = Some(true);
+        battle_log_data.damage = Some(attack);
+        battle_log_action = BattleLogAction::Hit;
+        println!("[handle_attack] Hit! {:?}", attack);
+    } else {
+        battle_log_data.missed = Some(true);
+        battle_log_action = BattleLogAction::Missed;
+        println!("[handle_attack] Missed");
+    }
+
+    let battle_log_data = serde_json::to_string(&battle_log_data).unwrap();
+    let mut battle_log = BattleLog::new(
+        battle_id.clone(),
+        attacker.user_id.clone(),
+        attacker.id.clone(),
+        battle_log_action,
+        battle_log_data,
+    );
+
+    println!("[handle_attack] Creating battle log");
+    if let Some(error) = battle_log.create().await {
+        println!("[handle_attack] Failed to create battle log: {:?}", error);
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Attack,
+            "Error creating battle log".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    attacker.current_attack -= 1;
+    attacker.current_speed -= 1;
+    defender.current_defense -= 1;
+    defender.current_intelligence -= 1;
+
+    println!("[handle_attack] Updating attacker");
+    if let Some(error) = attacker.update().await {
+        println!("[handle_attack] Failed to update attacker: {:?}", error);
         let error_queue = build_error(
             Some(session_user_id.clone()),
             user_name.clone(),
             BattleQueueChannel::Battle,
             BattleQueueAction::Error,
             BattleQueueDataAction::Escape,
+            "Error updating attacker".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    println!("[handle_attack] Updating defender");
+    if let Some(error) = defender.update().await {
+        println!("[handle_attack] Failed to update defender: {:?}", error);
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error updating defender".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    println!("[handle_attack] Updating battle game data");
+    if attacker.user_id == challenger.user_id {
+        battle_game_data.opponent_mnstr = Some(defender.clone());
+        battle_game_data.challenger_mnstr = Some(attacker.clone());
+    } else {
+        battle_game_data.opponent_mnstr = Some(attacker.clone());
+        battle_game_data.challenger_mnstr = Some(defender.clone());
+    }
+    battle_game_data.turn_user_id = Some(defender.user_id.clone());
+
+    if defender.current_health <= 0 {
+        println!("[handle_attack] Defender is dead!");
+        battle_game_data.winner_id = Some(attacker.user_id.clone());
+        queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
+        if let Some(error) = handle_game_ended(queue, session_user_id, user_name).await {
+            return Some(error);
+        }
+    } else {
+        queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
+    }
+    None
+}
+
+fn roll_dice(number: i32) -> i32 {
+    rand::rng().random_range(1..(number + 1))
+}
+
+async fn handle_game_ended(
+    queue: &mut BattleQueue,
+    session_user_id: &String,
+    user_name: &Option<String>,
+) -> Option<BattleQueue> {
+    println!("[handle_game_ended] Ending game");
+
+    println!("[handle_game_ended] Leaving battle");
+    if let Some(error) = handle_left(session_user_id).await {
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            queue.data.action.clone(),
             error.clone(),
         );
         return Some(error_queue);
@@ -958,6 +1129,7 @@ async fn handle_game_ended(
     let battle_game_data: BattleQueueGameData =
         serde_json::from_str(&raw_game_data.clone()).unwrap();
 
+    println!("[handle_game_ended] Finding battle");
     let mut battle = match Battle::find_one(battle_game_data.battle_id.clone().unwrap()).await {
         Ok(battle) => battle,
         Err(_) => {
@@ -966,13 +1138,14 @@ async fn handle_game_ended(
                 user_name.clone(),
                 BattleQueueChannel::Battle,
                 BattleQueueAction::Error,
-                BattleQueueDataAction::Escape,
+                queue.data.action.clone(),
                 "Error finding battle".to_string(),
             );
             return Some(error_queue);
         }
     };
 
+    println!("[handle_game_ended] Finding challenger mnstr");
     let challenger_mnstr =
         match Mnstr::find_one(battle.challenger_mnstr_id.clone().unwrap(), false).await {
             Ok(mnstr) => mnstr,
@@ -982,13 +1155,14 @@ async fn handle_game_ended(
                     user_name.clone(),
                     BattleQueueChannel::Battle,
                     BattleQueueAction::Error,
-                    BattleQueueDataAction::Escape,
+                    queue.data.action.clone(),
                     "Error finding challenger mnstr".to_string(),
                 );
                 return Some(error_queue);
             }
         };
 
+    println!("[handle_game_ended] Finding opponent mnstr");
     let opponent_mnstr =
         match Mnstr::find_one(battle.opponent_mnstr_id.clone().unwrap(), false).await {
             Ok(mnstr) => mnstr,
@@ -998,13 +1172,14 @@ async fn handle_game_ended(
                     user_name.clone(),
                     BattleQueueChannel::Battle,
                     BattleQueueAction::Error,
-                    BattleQueueDataAction::Escape,
+                    queue.data.action.clone(),
                     "Error finding opponent mnstr".to_string(),
                 );
                 return Some(error_queue);
             }
         };
 
+    println!("[handle_game_ended] Finding winner");
     let winner_user_id: String;
     let winner_mnstr_id: String;
     let loser_user_id: String;
@@ -1042,7 +1217,7 @@ async fn handle_game_ended(
             user_name.clone(),
             BattleQueueChannel::Battle,
             BattleQueueAction::Error,
-            BattleQueueDataAction::Escape,
+            queue.data.action.clone(),
             "Error finding winner".to_string(),
         );
         return Some(error_queue);
@@ -1050,6 +1225,8 @@ async fn handle_game_ended(
 
     battle.winner_id = Some(winner_user_id.clone());
     battle.winner_mnstr_id = Some(winner_mnstr_id.clone());
+
+    println!("[handle_game_ended] Updating battle");
     if let Some(error) = battle.update().await {
         println!(
             "[handle_escape_request] Failed to update battle: {:?}",
@@ -1065,6 +1242,8 @@ async fn handle_game_ended(
         );
         return Some(error_queue);
     }
+
+    println!("[handle_game_ended] Deleting battle");
     if let Some(error) = battle.delete().await {
         println!("[handle_game_ended] Failed to delete battle: {:?}", error);
         let error_queue = build_error(
@@ -1078,6 +1257,7 @@ async fn handle_game_ended(
         return Some(error_queue);
     }
 
+    println!("[handle_game_ended] Finding loser");
     let mut loser = match User::find_one(loser_user_id.clone(), false).await {
         Ok(user) => user,
         Err(_) => {
@@ -1093,6 +1273,7 @@ async fn handle_game_ended(
         }
     };
 
+    println!("[handle_game_ended] Finding loser mnstr");
     let mut loser_mnstr = match Mnstr::find_one(loser_mnstr_id.clone(), false).await {
         Ok(mnstr) => mnstr,
         Err(_) => {
@@ -1108,6 +1289,7 @@ async fn handle_game_ended(
         }
     };
 
+    println!("[handle_game_ended] Finding winner");
     let mut winner = match User::find_one(winner_user_id.clone(), false).await {
         Ok(user) => user,
         Err(_) => {
@@ -1123,6 +1305,7 @@ async fn handle_game_ended(
         }
     };
 
+    println!("[handle_game_ended] Finding winner mnstr");
     let mut winner_mnstr = match Mnstr::find_one(winner_mnstr_id.clone(), false).await {
         Ok(mnstr) => mnstr,
         Err(_) => {
@@ -1138,12 +1321,14 @@ async fn handle_game_ended(
         }
     };
 
+    println!("[handle_game_ended] Updating winner");
     let xp_to_next_level = XP_FOR_LEVEL[loser_mnstr.current_level as usize + 1];
     let winner_xp_awarded = (xp_to_next_level as f64 / 4.0).floor() as i32;
     let loser_xp_awarded = (xp_to_next_level as f64 / 8.0).floor() as i32;
     let winner_coins_awarded = loser_mnstr.coins();
     let loser_coins_awarded = 5;
 
+    println!("[handle_game_ended] Updating winner xp");
     if let Some(error) = winner.update_xp(winner_xp_awarded).await {
         println!(
             "[handle_escape_request] Failed to update winner xp: {:?}",
@@ -1159,6 +1344,8 @@ async fn handle_game_ended(
         );
         return Some(error_queue);
     }
+
+    println!("[handle_game_ended] Updating winner coins");
     if let Some(error) = winner.add_coins(winner_coins_awarded).await {
         println!(
             "[handle_escape_request] Failed to update winner coins: {:?}",
@@ -1174,6 +1361,8 @@ async fn handle_game_ended(
         );
         return Some(error_queue);
     }
+
+    println!("[handle_game_ended] Updating winner mnstr xp");
     if let Some(error) = winner_mnstr.update_xp(winner_xp_awarded).await {
         println!(
             "[handle_escape_request] Failed to update winner xp: {:?}",
@@ -1190,6 +1379,7 @@ async fn handle_game_ended(
         return Some(error_queue);
     }
 
+    println!("[handle_game_ended] Updating loser");
     if let Some(error) = loser.update_xp(loser_xp_awarded).await {
         println!(
             "[handle_escape_request] Failed to update loser xp: {:?}",
@@ -1205,6 +1395,8 @@ async fn handle_game_ended(
         );
         return Some(error_queue);
     }
+
+    println!("[handle_game_ended] Updating loser coins");
     if let Some(error) = loser.add_coins(loser_coins_awarded).await {
         println!(
             "[handle_escape_request] Failed to update loser coins: {:?}",
@@ -1220,6 +1412,8 @@ async fn handle_game_ended(
         );
         return Some(error_queue);
     }
+
+    println!("[handle_game_ended] Updating loser xp");
     if let Some(error) = loser_mnstr.update_xp(loser_xp_awarded).await {
         println!(
             "[handle_escape_request] Failed to update loser xp: {:?}",
@@ -1236,6 +1430,7 @@ async fn handle_game_ended(
         return Some(error_queue);
     }
 
+    println!("[handle_game_ended] Updating battle game data");
     let battle_game_data = BattleQueueGameData {
         winner_id: Some(winner_user_id),
         opponent_mnstr: Some(opponent_mnstr),
@@ -1248,7 +1443,10 @@ async fn handle_game_ended(
         winner_coins_awarded: Some(winner_coins_awarded),
         loser_coins_awarded: Some(loser_coins_awarded),
         loser_xp_awarded: Some(loser_xp_awarded),
+        turn_user_id: None,
     };
+
+    println!("[handle_game_ended] Updating battle queue");
     queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
     queue.data.user_id = Some(battle.challenger_id.clone());
     queue.data.opponent_id = Some(battle.opponent_id.clone());

@@ -94,7 +94,6 @@ impl BattleLog {
 
     pub async fn create(&mut self) -> Option<anyhow::Error> {
         let params = vec![
-            ("id", uuid::Uuid::new_v4().to_string().into()),
             ("battle_id", self.battle_id.clone().into()),
             ("user_id", self.user_id.clone().into()),
             ("mnstr_id", self.mnstr_id.clone().into()),

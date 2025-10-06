@@ -317,4 +317,13 @@ pub struct BattleQueueGameData {
     pub winner_coins_awarded: Option<i32>,
     pub loser_xp_awarded: Option<i32>,
     pub loser_coins_awarded: Option<i32>,
+    pub turn_user_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BattleLogData {
+    pub missed: Option<bool>,
+    pub hit: Option<bool>,
+    pub damage: Option<i32>,
 }
