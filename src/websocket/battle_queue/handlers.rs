@@ -993,8 +993,12 @@ async fn handle_attack(
         defender = opponent.clone();
     }
 
-    let attacker_roll = roll_dice(20) + (attacker.current_speed / 20) as i32;
-    let defender_roll = roll_dice(20) + (defender.current_intelligence / 20) as i32;
+    let attacker_roll = roll_dice(20)
+        + (attacker.current_speed / 20) as i32
+        + (attacker.current_attack / 20) as i32;
+    let defender_roll = roll_dice(20)
+        + (defender.current_intelligence / 20) as i32
+        + (defender.current_defense / 20) as i32;
 
     let mut battle_log_data = BattleLogData {
         missed: None,
@@ -1049,6 +1053,31 @@ async fn handle_attack(
     attacker.current_speed -= 1;
     defender.current_defense -= 1;
     defender.current_intelligence -= 1;
+
+    println!(
+        "[handle_attack] Attacker current attack: {:?}",
+        attacker.current_attack
+    );
+    println!(
+        "[handle_attack] Attacker current speed: {:?}",
+        attacker.current_speed
+    );
+    println!(
+        "[handle_attack] Attacker current health: {:?}",
+        attacker.current_health
+    );
+    println!(
+        "[handle_attack] Attacker current intelligence: {:?}",
+        attacker.current_intelligence
+    );
+    println!(
+        "[handle_attack] Defender current defense: {:?}",
+        defender.current_defense
+    );
+    println!(
+        "[handle_attack] Defender current health: {:?}",
+        defender.current_health
+    );
 
     println!("[handle_attack] Updating attacker");
     if let Some(error) = attacker.update().await {
