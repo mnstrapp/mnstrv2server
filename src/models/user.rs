@@ -430,8 +430,6 @@ impl User {
     }
 
     pub async fn update_xp(&mut self, xp: i32) -> Option<anyhow::Error> {
-        println!("[User::update_xp] Updating xp: {:?}", xp);
-
         self.experience_points += xp;
 
         let last_level_index = XP_FOR_LEVEL.len() as i32 - 1;
@@ -443,14 +441,6 @@ impl User {
 
         let mut remaining_overage = xp_overage;
         while remaining_overage >= 0 {
-            println!(
-                "[User::update_xp] Remaining overage: {:?}",
-                remaining_overage
-            );
-            println!(
-                "[User::update_xp] Experience level: {:?}",
-                self.experience_level
-            );
             self.experience_points = remaining_overage;
             self.experience_level += 1;
             xp_to_next_level = XP_FOR_LEVEL[self.experience_level as usize + 1];
@@ -463,21 +453,6 @@ impl User {
         }
 
         self.experience_to_next_level = xp_to_next_level;
-
-        println!("[User::update_xp] XP to next level: {:?}", xp_to_next_level);
-        println!("[User::update_xp] XP overage: {:?}", xp_overage);
-        println!(
-            "[User::update_xp] Experience level: {:?}",
-            self.experience_level
-        );
-        println!(
-            "[User::update_xp] Experience points: {:?}",
-            self.experience_points
-        );
-        println!(
-            "[User::update_xp] Experience to next level: {:?}",
-            self.experience_to_next_level
-        );
 
         if let Some(error) = self.update().await {
             println!("[User::update_xp] Failed to update user xp: {:?}", error);

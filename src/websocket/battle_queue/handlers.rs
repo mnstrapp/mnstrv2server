@@ -7,6 +7,7 @@ use crate::{
     models::{
         battle::Battle,
         battle_status::{BattleStatus, BattleStatusState},
+        generated::mnstr_xp::XP_FOR_LEVEL,
         mnstr::Mnstr,
         user::User,
     },
@@ -252,6 +253,7 @@ fn build_battle_queue(message: Result<rocket_ws::Message, Error>) -> Result<Batt
                 "[build_battle_queue] Error building battle queue: {:?}",
                 err
             );
+            println!("[build_battle_queue] Message: {:?}", message);
             return Ok(build_error(
                 None,
                 None,
@@ -379,6 +381,10 @@ async fn handle_incoming_ws_message(
 
     match build_battle_queue(message) {
         Ok(mut queue) => match queue.data.action {
+            BattleQueueDataAction::Connect => {
+                insert_initial_status_and_notify(connection, session_user_id, user_name).await;
+                None
+            }
             BattleQueueDataAction::List => {
                 match handle_list_request(session_user_id, user_name).await {
                     Ok(payload) => Some(payload),
@@ -395,23 +401,6 @@ async fn handle_incoming_ws_message(
                     ),
                 }
             }
-
-            // BattleQueueDataAction::Challenge => {
-            //     if let Err(_) =
-            //         handle_challenge_request(&queue, session_user_id, user_name, connection).await
-            //     {
-            //         let error_queue = build_error(
-            //             Some(session_user_id.clone()),
-            //             user_name.clone(),
-            //             BattleQueueChannel::Lobby,
-            //             BattleQueueAction::Error,
-            //             BattleQueueDataAction::Challenge,
-            //             "Error challenging opponent".to_string(),
-            //         );
-            //         publish_queue(connection, &error_queue).await;
-            //     }
-            //     None
-            // }
             BattleQueueDataAction::Accept => {
                 if let Err(_) =
                     handle_accept_challenge(&queue, session_user_id, user_name, connection).await
@@ -441,7 +430,7 @@ async fn handle_incoming_ws_message(
                 {
                     Ok(battle) => {
                         battle_game_data.battle_id = Some(battle.id.clone());
-                        if let Some(challenger_mnstr_id) = battle.challenger_mnstr_id {
+                        if let Some(challenger_mnstr_id) = battle.challenger_mnstr_id.clone() {
                             let challenger_mnstr =
                                 match Mnstr::find_one(challenger_mnstr_id, false).await {
                                     Ok(mnstr) => mnstr,
@@ -461,7 +450,7 @@ async fn handle_incoming_ws_message(
                             battle_game_data.challenger_mnstr = Some(challenger_mnstr);
                             queue.data.user_id = Some(battle.challenger_id.clone());
                         }
-                        if let Some(opponent_mnstr_id) = battle.opponent_mnstr_id {
+                        if let Some(opponent_mnstr_id) = battle.opponent_mnstr_id.clone() {
                             let opponent_mnstr =
                                 match Mnstr::find_one(opponent_mnstr_id, false).await {
                                     Ok(mnstr) => mnstr,
@@ -482,12 +471,13 @@ async fn handle_incoming_ws_message(
                             queue.data.opponent_id = Some(battle.opponent_id);
                         }
                         queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
-                        if battle_game_data.challenger_mnstr.is_some()
-                            && battle_game_data.opponent_mnstr.is_some()
+                        if battle.challenger_mnstr_id.is_some()
+                            && battle.opponent_mnstr_id.is_some()
                         {
                             queue.data.action = BattleQueueDataAction::GameStarted;
                             queue.action = BattleQueueAction::GameStarted;
                         }
+                        println!("[handle_incoming_ws_message] Queue: {:?}", queue);
                         publish_queue(connection, &queue).await;
                         None
                     }
@@ -607,6 +597,33 @@ async fn handle_incoming_ws_message(
                 }
             }
             BattleQueueDataAction::InGameAction => None,
+            BattleQueueDataAction::Escape => {
+                let game_data = queue.data.data.clone().unwrap();
+                let mut game_data: BattleQueueGameData =
+                    serde_json::from_str(&game_data.clone()).unwrap();
+
+                if let None = game_data.winner_id.clone() {
+                    let winner_id: String;
+                    let challenger_mnstr = game_data.challenger_mnstr.clone().unwrap();
+                    let opponent_mnstr = game_data.opponent_mnstr.clone().unwrap();
+
+                    if challenger_mnstr.user_id.clone() == session_user_id.clone() {
+                        winner_id = opponent_mnstr.user_id.clone();
+                    } else {
+                        winner_id = challenger_mnstr.user_id.clone();
+                    }
+                    game_data.winner_id = Some(winner_id);
+                    queue.data.data = Some(serde_json::to_string(&game_data).unwrap());
+                }
+
+                if let Some(error) = handle_game_ended(&mut queue, session_user_id, user_name).await
+                {
+                    publish_queue(connection, &error).await;
+                    return None;
+                }
+                publish_queue(connection, &queue).await;
+                None
+            }
             _ => {
                 publish_queue(connection, &queue).await;
                 None
@@ -752,6 +769,11 @@ async fn handle_accept_challenge(
         challenger_mnstrs: Some(challenger_mnstrs),
         opponent_mnstrs: Some(opponent_mnstrs),
         mnstr: None,
+        winner_id: None,
+        winner_xp_awarded: None,
+        winner_coins_awarded: None,
+        loser_xp_awarded: None,
+        loser_coins_awarded: None,
     };
 
     let battle_queue_game_data = serde_json::to_string(&battle_queue_game_data_map).unwrap();
@@ -860,7 +882,6 @@ async fn update_battle_mnstrs(
             return Err(error.into());
         }
     };
-    println!("[update_battle_mnstrs] Battle: {:?}", battle);
     if let Some(challenger_mnstr) = challenger_mnstr {
         println!(
             "[update_battle_mnstrs] Challenger mnstr: {:?}",
@@ -879,10 +900,7 @@ async fn update_battle_mnstrs(
         println!("[update_battle] Failed to update battle: {:?}", error);
         return Err(error.into());
     }
-    match battle.update().await {
-        None => Ok(battle),
-        Some(error) => Err(error.into()),
-    }
+    Ok(battle)
 }
 
 async fn load_mnstrs(user_id: &String) -> Result<Vec<Mnstr>, ()> {
@@ -901,4 +919,340 @@ async fn handle_rejoin_request(battle_id: &String) -> Result<Battle, ()> {
         }
     };
     Ok(battle)
+}
+
+async fn handle_left(session_user_id: &String, user_name: &Option<String>) -> Option<String> {
+    let mut status =
+        match BattleStatus::find_one_by(vec![("user_id", session_user_id.clone().into())]).await {
+            Ok(status) => status,
+            Err(error) => {
+                println!("[handle_left] Failed to find battle status: {:?}", error);
+                return Some("Error finding battle status".to_string());
+            }
+        };
+    if let Some(error) = status.delete().await {
+        println!("[handle_left] Failed to delete battle status: {:?}", error);
+        return Some("Error deleting battle status".to_string());
+    }
+    None
+}
+
+async fn handle_game_ended(
+    queue: &mut BattleQueue,
+    session_user_id: &String,
+    user_name: &Option<String>,
+) -> Option<BattleQueue> {
+    if let Some(error) = handle_left(session_user_id, user_name).await {
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            error.clone(),
+        );
+        return Some(error_queue);
+    }
+
+    let raw_game_data = queue.data.data.clone().unwrap();
+    let battle_game_data: BattleQueueGameData =
+        serde_json::from_str(&raw_game_data.clone()).unwrap();
+
+    let mut battle = match Battle::find_one(battle_game_data.battle_id.clone().unwrap()).await {
+        Ok(battle) => battle,
+        Err(_) => {
+            let error_queue = build_error(
+                Some(session_user_id.clone()),
+                user_name.clone(),
+                BattleQueueChannel::Battle,
+                BattleQueueAction::Error,
+                BattleQueueDataAction::Escape,
+                "Error finding battle".to_string(),
+            );
+            return Some(error_queue);
+        }
+    };
+
+    let challenger_mnstr =
+        match Mnstr::find_one(battle.challenger_mnstr_id.clone().unwrap(), false).await {
+            Ok(mnstr) => mnstr,
+            Err(_) => {
+                let error_queue = build_error(
+                    Some(session_user_id.clone()),
+                    user_name.clone(),
+                    BattleQueueChannel::Battle,
+                    BattleQueueAction::Error,
+                    BattleQueueDataAction::Escape,
+                    "Error finding challenger mnstr".to_string(),
+                );
+                return Some(error_queue);
+            }
+        };
+
+    let opponent_mnstr =
+        match Mnstr::find_one(battle.opponent_mnstr_id.clone().unwrap(), false).await {
+            Ok(mnstr) => mnstr,
+            Err(_) => {
+                let error_queue = build_error(
+                    Some(session_user_id.clone()),
+                    user_name.clone(),
+                    BattleQueueChannel::Battle,
+                    BattleQueueAction::Error,
+                    BattleQueueDataAction::Escape,
+                    "Error finding opponent mnstr".to_string(),
+                );
+                return Some(error_queue);
+            }
+        };
+
+    let winner_user_id: String;
+    let winner_mnstr_id: String;
+    let loser_user_id: String;
+    let loser_mnstr_id: String;
+
+    if let Some(winner_id) = battle_game_data.winner_id.clone() {
+        if winner_id == session_user_id.clone() {
+            if battle.challenger_id == session_user_id.clone() {
+                winner_user_id = challenger_mnstr.user_id.clone();
+                winner_mnstr_id = challenger_mnstr.id.clone();
+                loser_user_id = opponent_mnstr.user_id.clone();
+                loser_mnstr_id = opponent_mnstr.id.clone();
+            } else {
+                winner_user_id = opponent_mnstr.user_id.clone();
+                winner_mnstr_id = opponent_mnstr.id.clone();
+                loser_user_id = challenger_mnstr.user_id.clone();
+                loser_mnstr_id = challenger_mnstr.id.clone();
+            }
+        } else {
+            if battle.challenger_id != session_user_id.clone() {
+                winner_user_id = challenger_mnstr.user_id.clone();
+                winner_mnstr_id = challenger_mnstr.id.clone();
+                loser_user_id = opponent_mnstr.user_id.clone();
+                loser_mnstr_id = opponent_mnstr.id.clone();
+            } else {
+                winner_user_id = opponent_mnstr.user_id.clone();
+                winner_mnstr_id = opponent_mnstr.id.clone();
+                loser_user_id = challenger_mnstr.user_id.clone();
+                loser_mnstr_id = challenger_mnstr.id.clone();
+            }
+        }
+    } else {
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error finding winner".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    battle.winner_id = Some(winner_user_id.clone());
+    battle.winner_mnstr_id = Some(winner_mnstr_id.clone());
+    if let Some(error) = battle.update().await {
+        println!(
+            "[handle_escape_request] Failed to update battle: {:?}",
+            error
+        );
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error updating battle".to_string(),
+        );
+        return Some(error_queue);
+    }
+    if let Some(error) = battle.delete().await {
+        println!("[handle_game_ended] Failed to delete battle: {:?}", error);
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error deleting battle".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    let mut loser = match User::find_one(loser_user_id.clone(), false).await {
+        Ok(user) => user,
+        Err(_) => {
+            let error_queue = build_error(
+                Some(session_user_id.clone()),
+                user_name.clone(),
+                BattleQueueChannel::Battle,
+                BattleQueueAction::Error,
+                BattleQueueDataAction::Escape,
+                "Error finding loser".to_string(),
+            );
+            return Some(error_queue);
+        }
+    };
+
+    let mut loser_mnstr = match Mnstr::find_one(loser_mnstr_id.clone(), false).await {
+        Ok(mnstr) => mnstr,
+        Err(_) => {
+            let error_queue = build_error(
+                Some(session_user_id.clone()),
+                user_name.clone(),
+                BattleQueueChannel::Battle,
+                BattleQueueAction::Error,
+                BattleQueueDataAction::Escape,
+                "Error finding loser mnstr".to_string(),
+            );
+            return Some(error_queue);
+        }
+    };
+
+    let mut winner = match User::find_one(winner_user_id.clone(), false).await {
+        Ok(user) => user,
+        Err(_) => {
+            let error_queue = build_error(
+                Some(session_user_id.clone()),
+                user_name.clone(),
+                BattleQueueChannel::Battle,
+                BattleQueueAction::Error,
+                BattleQueueDataAction::Escape,
+                "Error finding winner".to_string(),
+            );
+            return Some(error_queue);
+        }
+    };
+
+    let mut winner_mnstr = match Mnstr::find_one(winner_mnstr_id.clone(), false).await {
+        Ok(mnstr) => mnstr,
+        Err(_) => {
+            let error_queue = build_error(
+                Some(session_user_id.clone()),
+                user_name.clone(),
+                BattleQueueChannel::Battle,
+                BattleQueueAction::Error,
+                BattleQueueDataAction::Escape,
+                "Error finding winner mnstr".to_string(),
+            );
+            return Some(error_queue);
+        }
+    };
+
+    let xp_to_next_level = XP_FOR_LEVEL[loser_mnstr.current_level as usize + 1];
+    let winner_xp_awarded = (xp_to_next_level as f64 / 4.0).floor() as i32;
+    let loser_xp_awarded = (xp_to_next_level as f64 / 8.0).floor() as i32;
+    let winner_coins_awarded = loser_mnstr.coins();
+    let loser_coins_awarded = 5;
+
+    if let Some(error) = winner.update_xp(winner_xp_awarded).await {
+        println!(
+            "[handle_escape_request] Failed to update winner xp: {:?}",
+            error
+        );
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error updating winner xp".to_string(),
+        );
+        return Some(error_queue);
+    }
+    if let Some(error) = winner.add_coins(winner_coins_awarded).await {
+        println!(
+            "[handle_escape_request] Failed to update winner coins: {:?}",
+            error
+        );
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error updating winner coins".to_string(),
+        );
+        return Some(error_queue);
+    }
+    if let Some(error) = winner_mnstr.update_xp(winner_xp_awarded).await {
+        println!(
+            "[handle_escape_request] Failed to update winner xp: {:?}",
+            error
+        );
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error updating winner xp".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    if let Some(error) = loser.update_xp(loser_xp_awarded).await {
+        println!(
+            "[handle_escape_request] Failed to update loser xp: {:?}",
+            error
+        );
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error updating loser xp".to_string(),
+        );
+        return Some(error_queue);
+    }
+    if let Some(error) = loser.add_coins(loser_coins_awarded).await {
+        println!(
+            "[handle_escape_request] Failed to update loser coins: {:?}",
+            error
+        );
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error updating loser coins".to_string(),
+        );
+        return Some(error_queue);
+    }
+    if let Some(error) = loser_mnstr.update_xp(loser_xp_awarded).await {
+        println!(
+            "[handle_escape_request] Failed to update loser xp: {:?}",
+            error
+        );
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error updating loser xp".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    let battle_game_data = BattleQueueGameData {
+        winner_id: Some(winner_user_id),
+        opponent_mnstr: Some(opponent_mnstr),
+        challenger_mnstr: Some(challenger_mnstr),
+        battle_id: Some(battle.id.clone()),
+        challenger_mnstrs: None,
+        opponent_mnstrs: None,
+        mnstr: None,
+        winner_xp_awarded: Some(winner_xp_awarded),
+        winner_coins_awarded: Some(winner_coins_awarded),
+        loser_coins_awarded: Some(loser_coins_awarded),
+        loser_xp_awarded: Some(loser_xp_awarded),
+    };
+    queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
+    queue.data.user_id = Some(battle.challenger_id.clone());
+    queue.data.opponent_id = Some(battle.opponent_id.clone());
+    queue.data.action = BattleQueueDataAction::GameEnded;
+    queue.action = BattleQueueAction::GameEnded;
+    None
 }

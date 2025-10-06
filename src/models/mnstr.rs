@@ -54,7 +54,8 @@ pub struct Mnstr {
     pub max_intelligence: i32,
     pub current_magic: i32,
     pub max_magic: i32,
-    // Relationships
+
+    pub experience_to_next_level: i32,
 }
 
 const DEFAULT_STAT_VALUE: i32 = 10;
@@ -89,6 +90,7 @@ impl Mnstr {
             max_intelligence: DEFAULT_STAT_VALUE,
             current_magic: DEFAULT_STAT_VALUE,
             max_magic: DEFAULT_STAT_VALUE,
+            experience_to_next_level: 0,
         }
     }
     pub fn copy_with(
@@ -113,6 +115,7 @@ impl Mnstr {
         max_intelligence: Option<i32>,
         current_magic: Option<i32>,
         max_magic: Option<i32>,
+        experience_to_next_level: Option<i32>,
     ) -> Self {
         let created_at = match created_at {
             Some(created_at) => Some(created_at),
@@ -150,6 +153,8 @@ impl Mnstr {
             max_intelligence: max_intelligence.unwrap_or(self.max_intelligence),
             current_magic: current_magic.unwrap_or(self.current_magic),
             max_magic: max_magic.unwrap_or(self.max_magic),
+            experience_to_next_level: experience_to_next_level
+                .unwrap_or(self.experience_to_next_level),
         }
     }
 
@@ -203,6 +208,9 @@ impl Mnstr {
             println!("[Mnstr::create] Failed to add coins: {:?}", error);
             return Some(error.into());
         }
+
+        self.update_experience_to_next_level();
+
         None
     }
 
@@ -236,6 +244,9 @@ impl Mnstr {
             }
         };
         *self = mnstr;
+
+        self.update_experience_to_next_level();
+
         None
     }
 
@@ -286,6 +297,9 @@ impl Mnstr {
                 return Err(error.into());
             }
         }
+
+        mnstr.update_experience_to_next_level();
+
         if get_relationships {
             if let Some(error) = mnstr.get_relationships().await {
                 println!("[Mnstr::find_one] Failed to get relationships: {:?}", error);
@@ -315,6 +329,9 @@ impl Mnstr {
                 return Err(error.into());
             }
         }
+
+        mnstr.update_experience_to_next_level();
+
         if get_relationships {
             if let Some(error) = mnstr.get_relationships().await {
                 println!("[Mnstr::find_one] Failed to get relationships: {:?}", error);
@@ -342,6 +359,9 @@ impl Mnstr {
                     return Err(error.into());
                 }
             }
+
+            mnstr.update_experience_to_next_level();
+
             if get_relationships {
                 if let Some(error) = mnstr.get_relationships().await {
                     println!("[Mnstr::find_all] Failed to get relationships: {:?}", error);
@@ -373,6 +393,9 @@ impl Mnstr {
                     return Err(error.into());
                 }
             }
+
+            mnstr.update_experience_to_next_level();
+
             if get_relationships {
                 if let Some(error) = mnstr.get_relationships().await {
                     println!(
@@ -435,6 +458,47 @@ impl Mnstr {
     pub async fn get_relationships(&mut self) -> Option<Error> {
         None
     }
+
+    pub fn update_experience_to_next_level(&mut self) {
+        let last_level_index = XP_FOR_LEVEL.len() as i32 - 1;
+        let mut xp_to_next_level = XP_FOR_LEVEL[last_level_index as usize];
+        if self.current_level < last_level_index {
+            xp_to_next_level = XP_FOR_LEVEL[self.current_level as usize + 1];
+        }
+        self.experience_to_next_level = xp_to_next_level;
+    }
+
+    pub async fn update_xp(&mut self, xp: i32) -> Option<anyhow::Error> {
+        self.current_experience += xp;
+
+        let last_level_index = XP_FOR_LEVEL.len() as i32 - 1;
+        let mut xp_to_next_level = XP_FOR_LEVEL[last_level_index as usize];
+        if self.current_level < last_level_index {
+            xp_to_next_level = XP_FOR_LEVEL[self.current_level as usize + 1];
+        }
+        let xp_overage = self.current_experience - xp_to_next_level;
+
+        let mut remaining_overage = xp_overage;
+        while remaining_overage >= 0 {
+            self.current_experience = remaining_overage;
+            self.current_level += 1;
+            xp_to_next_level = XP_FOR_LEVEL[self.current_level as usize + 1];
+            remaining_overage -= xp_to_next_level;
+
+            xp_to_next_level = XP_FOR_LEVEL[self.current_level as usize + 1];
+            if remaining_overage < 0 {
+                self.current_experience = 0;
+            }
+        }
+
+        self.experience_to_next_level = xp_to_next_level;
+
+        if let Some(error) = self.update().await {
+            println!("[Mnstr::update_xp] Failed to update mnstr xp: {:?}", error);
+            return Some(error.into());
+        }
+        None
+    }
 }
 
 impl DatabaseResource for Mnstr {
@@ -469,6 +533,7 @@ impl DatabaseResource for Mnstr {
             max_intelligence: row.get("max_intelligence"),
             current_magic: row.get("current_magic"),
             max_magic: row.get("max_magic"),
+            experience_to_next_level: 0,
         })
     }
     fn has_id() -> bool {

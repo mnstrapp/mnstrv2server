@@ -312,4 +312,9 @@ pub struct BattleQueueGameData {
     pub opponent_mnstr: Option<Mnstr>,
     pub opponent_mnstrs: Option<Vec<Mnstr>>,
     pub mnstr: Option<Mnstr>,
+    pub winner_id: Option<String>,
+    pub winner_xp_awarded: Option<i32>,
+    pub winner_coins_awarded: Option<i32>,
+    pub loser_xp_awarded: Option<i32>,
+    pub loser_coins_awarded: Option<i32>,
 }
