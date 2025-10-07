@@ -671,8 +671,24 @@ async fn handle_incoming_ws_message(
                 publish_queue(connection, &queue).await;
                 None
             }
-            BattleQueueDataAction::Defend => None,
-            BattleQueueDataAction::Magic => None,
+            BattleQueueDataAction::Defend => {
+                if let Some(error) = handle_defend(&mut queue, session_user_id, user_name).await {
+                    publish_queue(connection, &error).await;
+                    return None;
+                }
+                println!("[handle_defend] Publishing queue: {:?}", queue);
+                publish_queue(connection, &queue).await;
+                None
+            }
+            BattleQueueDataAction::Magic => {
+                if let Some(error) = handle_magic(&mut queue, session_user_id, user_name).await {
+                    publish_queue(connection, &error).await;
+                    return None;
+                }
+                println!("[handle_magic] Publishing queue: {:?}", queue);
+                publish_queue(connection, &queue).await;
+                None
+            }
             _ => {
                 publish_queue(connection, &queue).await;
                 None
@@ -1030,6 +1046,7 @@ async fn handle_attack(
         missed: None,
         hit: None,
         damage: None,
+        defense: None,
     };
 
     let battle_log_action;
@@ -1088,7 +1105,7 @@ async fn handle_attack(
             user_name.clone(),
             BattleQueueChannel::Battle,
             BattleQueueAction::Error,
-            BattleQueueDataAction::Escape,
+            BattleQueueDataAction::Attack,
             "Error updating attacker".to_string(),
         );
         return Some(error_queue);
@@ -1102,7 +1119,239 @@ async fn handle_attack(
             user_name.clone(),
             BattleQueueChannel::Battle,
             BattleQueueAction::Error,
-            BattleQueueDataAction::Escape,
+            BattleQueueDataAction::Attack,
+            "Error updating defender".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    println!("[handle_attack] Updating battle game data");
+    if attacker.user_id == challenger.user_id {
+        battle_game_data.opponent_mnstr = Some(defender.clone());
+        battle_game_data.challenger_mnstr = Some(attacker.clone());
+    } else {
+        battle_game_data.opponent_mnstr = Some(attacker.clone());
+        battle_game_data.challenger_mnstr = Some(defender.clone());
+    }
+    battle_game_data.turn_user_id = Some(defender.user_id.clone());
+
+    if defender.current_health <= 0 {
+        println!("[handle_attack] Defender is dead!");
+        battle_game_data.winner_id = Some(attacker.user_id.clone());
+        queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
+        if let Some(error) = handle_game_ended(queue, session_user_id, user_name).await {
+            return Some(error);
+        }
+    } else {
+        queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
+    }
+    None
+}
+
+async fn handle_defend(
+    queue: &mut BattleQueue,
+    session_user_id: &String,
+    user_name: &Option<String>,
+) -> Option<BattleQueue> {
+    let game_data = queue.data.data.clone().unwrap();
+    let mut battle_game_data: BattleQueueGameData =
+        serde_json::from_str(&game_data.clone()).unwrap();
+
+    let battle_id = battle_game_data.battle_id.clone().unwrap();
+    let challenger = battle_game_data.challenger_mnstr.clone().unwrap();
+    let opponent = battle_game_data.opponent_mnstr.clone().unwrap();
+    let turn_user_id = battle_game_data.turn_user_id.clone().unwrap();
+
+    // attacker is the one taking the action (in this case, defending)
+    let mut attacker;
+    let defender;
+    if turn_user_id != challenger.user_id {
+        defender = challenger.clone();
+        attacker = opponent.clone();
+    } else {
+        defender = opponent.clone();
+        attacker = challenger.clone();
+    }
+
+    let mut defense = roll_dice(20);
+    if defense > attacker.max_defense {
+        defense = attacker.max_defense;
+    }
+    attacker.current_defense = defense;
+
+    let battle_log_data = BattleLogData {
+        missed: None,
+        hit: None,
+        damage: None,
+        defense: Some(defense),
+    };
+
+    let battle_log_action;
+
+    battle_log_action = BattleLogAction::Defended;
+    println!("[handle_defend] Defend! {:?}", defense);
+
+    let battle_log_data = serde_json::to_string(&battle_log_data).unwrap();
+    let mut battle_log = BattleLog::new(
+        battle_id.clone(),
+        defender.user_id.clone(),
+        defender.id.clone(),
+        battle_log_action,
+        battle_log_data,
+    );
+
+    println!("[handle_defend] Creating battle log");
+    if let Some(error) = battle_log.create().await {
+        println!("[handle_defend] Failed to create battle log: {:?}", error);
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Defend,
+            "Error creating battle log".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    println!("[handle_defend] Updating defender");
+    if let Some(error) = attacker.update().await {
+        println!("[handle_defend] Failed to update defender: {:?}", error);
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Defend,
+            "Error updating defender".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    println!("[handle_defend] Updating battle game data");
+    if attacker.user_id != challenger.user_id {
+        battle_game_data.opponent_mnstr = Some(attacker.clone());
+        battle_game_data.challenger_mnstr = Some(defender.clone());
+    } else {
+        battle_game_data.opponent_mnstr = Some(defender.clone());
+        battle_game_data.challenger_mnstr = Some(attacker.clone());
+    }
+    battle_game_data.turn_user_id = Some(attacker.user_id.clone());
+    queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
+
+    None
+}
+
+async fn handle_magic(
+    queue: &mut BattleQueue,
+    session_user_id: &String,
+    user_name: &Option<String>,
+) -> Option<BattleQueue> {
+    let game_data = queue.data.data.clone().unwrap();
+    let mut battle_game_data: BattleQueueGameData =
+        serde_json::from_str(&game_data.clone()).unwrap();
+
+    let battle_id = battle_game_data.battle_id.clone().unwrap();
+    let challenger = battle_game_data.challenger_mnstr.clone().unwrap();
+    let opponent = battle_game_data.opponent_mnstr.clone().unwrap();
+    let turn_user_id = battle_game_data.turn_user_id.clone().unwrap();
+
+    let mut attacker;
+    let mut defender;
+    if turn_user_id == challenger.user_id {
+        attacker = opponent.clone();
+        defender = challenger.clone();
+    } else {
+        attacker = challenger.clone();
+        defender = opponent.clone();
+    }
+
+    let attacker_roll = roll_dice(20) + (attacker.current_magic / 20) as i32;
+    let defender_roll = roll_dice(20) + (defender.current_magic / 20) as i32;
+
+    let mut battle_log_data = BattleLogData {
+        missed: None,
+        hit: None,
+        damage: None,
+        defense: None,
+    };
+
+    let battle_log_action;
+
+    if attacker_roll > defender_roll {
+        let attack = attacker_roll;
+        if attack > defender.current_health {
+            defender.current_health = 0;
+        } else {
+            defender.current_health -= attack;
+        }
+
+        battle_log_data.hit = Some(true);
+        battle_log_data.damage = Some(attack);
+        battle_log_action = BattleLogAction::Hit;
+        println!("[handle_attack] Hit! {:?}", attack);
+    } else {
+        battle_log_data.missed = Some(true);
+        battle_log_action = BattleLogAction::Missed;
+        println!("[handle_attack] Missed");
+    }
+
+    let battle_log_data = serde_json::to_string(&battle_log_data).unwrap();
+    let mut battle_log = BattleLog::new(
+        battle_id.clone(),
+        attacker.user_id.clone(),
+        attacker.id.clone(),
+        battle_log_action,
+        battle_log_data,
+    );
+
+    println!("[handle_attack] Creating battle log");
+    if let Some(error) = battle_log.create().await {
+        println!("[handle_attack] Failed to create battle log: {:?}", error);
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Attack,
+            "Error creating battle log".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    attacker.current_magic -= 1;
+    defender.current_magic -= 1;
+
+    if attacker.current_magic <= 0 {
+        attacker.current_magic = 0;
+    }
+    if defender.current_magic <= 0 {
+        defender.current_magic = 0;
+    }
+
+    println!("[handle_attack] Updating attacker");
+    if let Some(error) = attacker.update().await {
+        println!("[handle_attack] Failed to update attacker: {:?}", error);
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Magic,
+            "Error updating attacker".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    println!("[handle_attack] Updating defender");
+    if let Some(error) = defender.update().await {
+        println!("[handle_attack] Failed to update defender: {:?}", error);
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Magic,
             "Error updating defender".to_string(),
         );
         return Some(error_queue);

@@ -62,7 +62,6 @@ pub enum BattleQueueAction {
     Defend,
     Magic,
     Escape,
-    UpdateMnstr,
 }
 
 impl std::fmt::Display for BattleQueueAction {
@@ -93,7 +92,6 @@ impl std::fmt::Display for BattleQueueAction {
             BattleQueueAction::Defend => write!(f, "defend"),
             BattleQueueAction::Magic => write!(f, "magic"),
             BattleQueueAction::Escape => write!(f, "escape"),
-            BattleQueueAction::UpdateMnstr => write!(f, "updateMnstr"),
         }
     }
 }
@@ -125,7 +123,6 @@ impl From<String> for BattleQueueAction {
             "defend" => BattleQueueAction::Defend,
             "magic" => BattleQueueAction::Magic,
             "escape" => BattleQueueAction::Escape,
-            "updateMnstr" => BattleQueueAction::UpdateMnstr,
             _ => BattleQueueAction::Joined,
         }
     }
@@ -205,7 +202,6 @@ pub enum BattleQueueDataAction {
     Defend,
     Magic,
     Escape,
-    UpdateMnstr,
 }
 
 impl From<String> for BattleQueueDataAction {
@@ -233,7 +229,6 @@ impl From<String> for BattleQueueDataAction {
             "defend" => BattleQueueDataAction::Defend,
             "magic" => BattleQueueDataAction::Magic,
             "escape" => BattleQueueDataAction::Escape,
-            "updateMnstr" => BattleQueueDataAction::UpdateMnstr,
             _ => BattleQueueDataAction::Connect,
         }
     }
@@ -326,4 +321,5 @@ pub struct BattleLogData {
     pub missed: Option<bool>,
     pub hit: Option<bool>,
     pub damage: Option<i32>,
+    pub defense: Option<i32>,
 }
