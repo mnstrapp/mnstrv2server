@@ -1042,6 +1042,8 @@ async fn handle_attack(
         + (defender.current_intelligence / 20) as i32
         + (defender.current_defense / 20) as i32;
 
+    let difference = attacker_roll - defender_roll;
+
     let mut battle_log_data = BattleLogData {
         missed: None,
         hit: None,
@@ -1051,18 +1053,17 @@ async fn handle_attack(
 
     let battle_log_action;
 
-    if attacker_roll > defender_roll {
-        let attack = attacker_roll;
-        if attack > defender.current_defense {
+    if difference > 0 {
+        if difference > defender.current_defense {
             defender.current_health = 0;
         } else {
-            defender.current_health -= attack;
+            defender.current_health -= difference;
         }
 
         battle_log_data.hit = Some(true);
-        battle_log_data.damage = Some(attack);
+        battle_log_data.damage = Some(difference);
         battle_log_action = BattleLogAction::Hit;
-        println!("[handle_attack] Hit! {:?}", attack);
+        println!("[handle_attack] Hit! {:?}", difference);
     } else {
         battle_log_data.missed = Some(true);
         battle_log_action = BattleLogAction::Missed;
@@ -1178,6 +1179,7 @@ async fn handle_defend(
         defense = attacker.max_defense;
     }
     attacker.current_defense += defense;
+    attacker.current_intelligence += defense;
 
     let battle_log_data = BattleLogData {
         missed: None,
@@ -1268,6 +1270,7 @@ async fn handle_magic(
 
     let attacker_roll = roll_dice(20) + (attacker.current_magic / 20) as i32;
     let defender_roll = roll_dice(20) + (defender.current_magic / 20) as i32;
+    let difference = attacker_roll - defender_roll;
 
     let mut battle_log_data = BattleLogData {
         missed: None,
@@ -1278,24 +1281,22 @@ async fn handle_magic(
 
     let battle_log_action;
 
-    if attacker_roll > defender_roll {
-        let attack = attacker_roll;
-        if attack > defender.current_health {
+    if difference > 0 {
+        if difference > defender.current_health {
             defender.current_health = 0;
         } else {
-            defender.current_health -= attack;
+            defender.current_health -= difference;
         }
 
         battle_log_data.hit = Some(true);
-        battle_log_data.damage = Some(attack);
+        battle_log_data.damage = Some(difference);
         battle_log_action = BattleLogAction::Hit;
-        println!("[handle_attack] Hit! {:?}", attack);
+        println!("[handle_attack] Hit! {:?}", difference);
     } else {
         battle_log_data.missed = Some(true);
         battle_log_action = BattleLogAction::Missed;
         println!("[handle_attack] Missed");
     }
-
     let battle_log_data = serde_json::to_string(&battle_log_data).unwrap();
     let mut battle_log = BattleLog::new(
         battle_id.clone(),
