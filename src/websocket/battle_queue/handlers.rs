@@ -1166,18 +1166,18 @@ async fn handle_defend(
     let mut attacker;
     let defender;
     if turn_user_id != challenger.user_id {
-        defender = challenger.clone();
-        attacker = opponent.clone();
-    } else {
         defender = opponent.clone();
         attacker = challenger.clone();
+    } else {
+        defender = challenger.clone();
+        attacker = opponent.clone();
     }
 
     let mut defense = roll_dice(20);
-    if defense > attacker.max_defense {
+    if (defense + attacker.current_defense) >= attacker.max_defense {
         defense = attacker.max_defense;
     }
-    attacker.current_defense = defense;
+    attacker.current_defense += defense;
 
     let battle_log_data = BattleLogData {
         missed: None,
@@ -1236,7 +1236,7 @@ async fn handle_defend(
         battle_game_data.opponent_mnstr = Some(defender.clone());
         battle_game_data.challenger_mnstr = Some(attacker.clone());
     }
-    battle_game_data.turn_user_id = Some(attacker.user_id.clone());
+    battle_game_data.turn_user_id = Some(defender.user_id.clone());
     queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
 
     None
@@ -1705,6 +1705,54 @@ async fn handle_game_ended(
             BattleQueueAction::Error,
             BattleQueueDataAction::Escape,
             "Error updating loser xp".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    println!("[handle_game_ended] Resetting loser mnstr");
+    loser_mnstr.current_defense = loser_mnstr.max_defense;
+    loser_mnstr.current_attack = loser_mnstr.max_attack;
+    loser_mnstr.current_intelligence = loser_mnstr.max_intelligence;
+    loser_mnstr.current_speed = loser_mnstr.max_speed;
+    loser_mnstr.current_magic = loser_mnstr.max_magic;
+    loser_mnstr.current_health = loser_mnstr.max_health;
+
+    println!("[handle_game_ended] Resetting winner mnstr");
+    winner_mnstr.current_defense = winner_mnstr.max_defense;
+    winner_mnstr.current_attack = winner_mnstr.max_attack;
+    winner_mnstr.current_intelligence = winner_mnstr.max_intelligence;
+    winner_mnstr.current_speed = winner_mnstr.max_speed;
+    winner_mnstr.current_magic = winner_mnstr.max_magic;
+    winner_mnstr.current_health = winner_mnstr.max_health;
+
+    if let Some(error) = loser_mnstr.update().await {
+        println!(
+            "[handle_game_ended] Failed to update loser mnstr: {:?}",
+            error
+        );
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error updating loser mnstr".to_string(),
+        );
+        return Some(error_queue);
+    }
+
+    if let Some(error) = winner_mnstr.update().await {
+        println!(
+            "[handle_game_ended] Failed to update winner mnstr: {:?}",
+            error
+        );
+        let error_queue = build_error(
+            Some(session_user_id.clone()),
+            user_name.clone(),
+            BattleQueueChannel::Battle,
+            BattleQueueAction::Error,
+            BattleQueueDataAction::Escape,
+            "Error updating winner mnstr".to_string(),
         );
         return Some(error_queue);
     }
