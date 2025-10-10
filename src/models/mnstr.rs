@@ -395,6 +395,7 @@ impl Mnstr {
             }
 
             mnstr.update_experience_to_next_level();
+            println!("[Mnstr::find_all_by] Mnstr: {:?}", mnstr);
 
             if get_relationships {
                 if let Some(error) = mnstr.get_relationships().await {

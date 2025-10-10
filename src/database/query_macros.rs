@@ -57,7 +57,7 @@ macro_rules! find_all_resources_where_fields {
                     query.push_str(" AND ");
                 }
             }
-            query.push_str(" ORDER BY created_at DESC");
+            query.push_str(" ORDER BY updated_at DESC");
 
             let mut query = sqlx::query(&query);
             for value in values.iter() {
