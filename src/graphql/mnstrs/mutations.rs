@@ -154,7 +154,7 @@ pub async fn create(
     mnstr.max_magic = max_magic.unwrap_or(10) as i32;
 
     if let Some(error) = mnstr.create().await {
-        println!("[collect] Failed to create mnstr: {:?}", error);
+        println!("[create] Failed to create mnstr: {:?}", error);
         return Err(FieldError::from("Failed to create mnstr"));
     }
 
