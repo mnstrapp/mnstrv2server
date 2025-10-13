@@ -54,6 +54,12 @@ pub struct BattleStatus {
         deserialize_with = "deserialize_offset_date_time"
     )]
     pub created_at: Option<OffsetDateTime>,
+
+    #[serde(
+        serialize_with = "serialize_offset_date_time",
+        deserialize_with = "deserialize_offset_date_time"
+    )]
+    pub updated_at: Option<OffsetDateTime>,
 }
 
 impl BattleStatus {
@@ -74,6 +80,7 @@ impl BattleStatus {
             battle_id,
             status,
             created_at: None,
+            updated_at: None,
         }
     }
 
@@ -85,6 +92,7 @@ impl BattleStatus {
             ("opponent_name", self.opponent_name.clone().into()),
             ("battle_id", self.battle_id.clone().into()),
             ("status", self.status.clone().to_string().into()),
+            ("updated_at", self.updated_at.clone().into()),
         ];
         let battle_status = match insert_resource!(BattleStatus, params).await {
             Ok(battle_status) => battle_status,
@@ -159,7 +167,8 @@ impl BattleStatus {
 impl DatabaseResource for BattleStatus {
     fn from_row(row: &PgRow) -> Result<Self, Error> {
         let created_at = row.get("created_at");
-
+        let updated_at = row.get("updated_at");
+        
         Ok(BattleStatus {
             id: row.get("id"),
             user_id: row.get("user_id"),
@@ -169,6 +178,7 @@ impl DatabaseResource for BattleStatus {
             battle_id: row.get("battle_id"),
             status: row.get::<String, _>("status").into(),
             created_at: Some(created_at),
+            updated_at: Some(updated_at),
         })
     }
 
@@ -179,7 +189,7 @@ impl DatabaseResource for BattleStatus {
         false
     }
     fn is_updatable() -> bool {
-        false
+        true
     }
     fn is_creatable() -> bool {
         true

@@ -4,7 +4,7 @@ use redis::AsyncTypedCommands;
 use rocket_ws::{Config, Stream, WebSocket, result::Error};
 
 use crate::{
-    delete_resource_where_fields, insert_resource,
+    delete_resource_where_fields,
     models::{
         battle::Battle,
         battle_log::{BattleLog, BattleLogAction},
@@ -709,8 +709,16 @@ async fn handle_incoming_ws_message(
 async fn handle_list_request(
     requester_user_id: &String,
     user_name: &Option<String>,
-) -> Result<String, ()> {
-    let list = BattleStatus::find_all().await.map_err(|_| ())?;
+) -> Result<String, anyhow::Error> {
+    println!("[handle_list_request] Requester user id: {:?}", requester_user_id);
+    let list = match BattleStatus::find_all().await {
+        Ok(list) => list,
+        Err(err) => {
+            println!("[handle_list_request] Error finding all battle statuses: {:?}", err);
+            return Err(err.into());
+        }
+    };
+    print!("[handle_list_request] List: {:?}", list);
     let list = list
         .into_iter()
         .filter(|item| item.user_id != *requester_user_id)
