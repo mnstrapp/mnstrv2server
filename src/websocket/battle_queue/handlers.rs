@@ -710,11 +710,17 @@ async fn handle_list_request(
     requester_user_id: &String,
     user_name: &Option<String>,
 ) -> Result<String, anyhow::Error> {
-    println!("[handle_list_request] Requester user id: {:?}", requester_user_id);
+    println!(
+        "[handle_list_request] Requester user id: {:?}",
+        requester_user_id
+    );
     let list = match BattleStatus::find_all().await {
         Ok(list) => list,
         Err(err) => {
-            println!("[handle_list_request] Error finding all battle statuses: {:?}", err);
+            println!(
+                "[handle_list_request] Error finding all battle statuses: {:?}",
+                err
+            );
             return Err(err.into());
         }
     };
@@ -856,6 +862,7 @@ async fn handle_accept_challenge(
         loser_xp_awarded: None,
         loser_coins_awarded: None,
         turn_user_id: Some(turn_user_id),
+        log_data: None,
     };
 
     let battle_queue_game_data = serde_json::to_string(&battle_queue_game_data_map).unwrap();
@@ -1077,6 +1084,7 @@ async fn handle_attack(
         battle_log_action = BattleLogAction::Missed;
         println!("[handle_attack] Missed");
     }
+    battle_game_data.log_data = Some(battle_log_data.clone());
 
     let battle_log_data = serde_json::to_string(&battle_log_data).unwrap();
     let mut battle_log = BattleLog::new(
@@ -1201,6 +1209,8 @@ async fn handle_defend(
     battle_log_action = BattleLogAction::Defended;
     println!("[handle_defend] Defend! {:?}", defense);
 
+    battle_game_data.log_data = Some(battle_log_data.clone());
+
     let battle_log_data = serde_json::to_string(&battle_log_data).unwrap();
     let mut battle_log = BattleLog::new(
         battle_id.clone(),
@@ -1305,6 +1315,9 @@ async fn handle_magic(
         battle_log_action = BattleLogAction::Missed;
         println!("[handle_attack] Missed");
     }
+
+    battle_game_data.log_data = Some(battle_log_data.clone());
+
     let battle_log_data = serde_json::to_string(&battle_log_data).unwrap();
     let mut battle_log = BattleLog::new(
         battle_id.clone(),
@@ -1780,6 +1793,7 @@ async fn handle_game_ended(
         loser_coins_awarded: Some(loser_coins_awarded),
         loser_xp_awarded: Some(loser_xp_awarded),
         turn_user_id: None,
+        log_data: None,
     };
 
     println!("[handle_game_ended] Updating battle queue");
