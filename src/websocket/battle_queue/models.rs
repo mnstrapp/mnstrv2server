@@ -313,7 +313,7 @@ pub struct BattleQueueGameData {
     pub loser_xp_awarded: Option<i32>,
     pub loser_coins_awarded: Option<i32>,
     pub turn_user_id: Option<String>,
-    pub log_data: Option<BattleLogData>,
+    pub battle_log_data: Option<BattleLogData>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
