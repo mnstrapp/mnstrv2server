@@ -26,18 +26,21 @@ pub struct Mnstr {
         serialize_with = "serialize_offset_date_time",
         deserialize_with = "deserialize_offset_date_time"
     )]
+    #[graphql(skip)]
     pub created_at: Option<OffsetDateTime>,
 
     #[serde(
         serialize_with = "serialize_offset_date_time",
         deserialize_with = "deserialize_offset_date_time"
     )]
+    #[graphql(skip)]
     pub updated_at: Option<OffsetDateTime>,
 
     #[serde(
         serialize_with = "serialize_offset_date_time",
         deserialize_with = "deserialize_offset_date_time"
     )]
+    #[graphql(skip)]
     pub archived_at: Option<OffsetDateTime>,
 
     pub current_level: i32,
