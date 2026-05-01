@@ -7,6 +7,7 @@ use time::OffsetDateTime;
 use crate::{
     database::{traits::DatabaseResource, values::DatabaseValue},
     delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
+    graphql::mnstrs::queries::{MnstrOrderByInput, MnstrOrderDirectionInput},
     insert_resource,
     models::{generated::mnstr_xp::XP_FOR_LEVEL, user::User},
     update_resource,
@@ -344,8 +345,19 @@ impl Mnstr {
         Ok(mnstr)
     }
 
-    pub async fn find_all(get_relationships: bool) -> Result<Vec<Self>, anyhow::Error> {
-        let mut mnstrs = match find_all_resources_where_fields!(Mnstr, vec![]).await {
+    pub async fn find_all(
+        get_relationships: bool,
+        order_by: Option<MnstrOrderByInput>,
+        order_direction: Option<MnstrOrderDirectionInput>,
+    ) -> Result<Vec<Self>, anyhow::Error> {
+        let mut mnstrs = match find_all_resources_where_fields!(
+            Mnstr,
+            vec![],
+            order_by,
+            order_direction
+        )
+        .await
+        {
             Ok(mnstrs) => mnstrs,
             Err(e) => {
                 println!("[Mnstr::find_all] Failed to get mnstrs: {:?}", e);
@@ -378,8 +390,17 @@ impl Mnstr {
     pub async fn find_all_by(
         params: Vec<(&str, DatabaseValue)>,
         get_relationships: bool,
+        order_by: Option<MnstrOrderByInput>,
+        order_direction: Option<MnstrOrderDirectionInput>,
     ) -> Result<Vec<Self>, anyhow::Error> {
-        let mut mnstrs = match find_all_resources_where_fields!(Mnstr, params).await {
+        let mut mnstrs = match find_all_resources_where_fields!(
+            Mnstr,
+            params,
+            order_by,
+            order_direction
+        )
+        .await
+        {
             Ok(mnstrs) => mnstrs,
             Err(e) => {
                 println!("[Mnstr::find_all_by] Failed to get mnstrs: {:?}", e);

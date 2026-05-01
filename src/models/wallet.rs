@@ -117,7 +117,7 @@ impl Wallet {
     }
 
     pub async fn find_all() -> Result<Vec<Self>, anyhow::Error> {
-        let mut wallets = match find_all_resources_where_fields!(Wallet, vec![]).await {
+        let mut wallets = match find_all_resources_where_fields!(Wallet, vec![], None, None).await {
             Ok(wallets) => wallets,
             Err(e) => return Err(e.into()),
         };
@@ -136,7 +136,7 @@ impl Wallet {
     pub async fn find_all_by(
         params: Vec<(&str, DatabaseValue)>,
     ) -> Result<Vec<Self>, anyhow::Error> {
-        let mut wallets = match find_all_resources_where_fields!(Wallet, params).await {
+        let mut wallets = match find_all_resources_where_fields!(Wallet, params, None, None).await {
             Ok(wallets) => wallets,
             Err(e) => return Err(e.into()),
         };
@@ -162,7 +162,9 @@ impl Wallet {
     pub async fn get_coins(&mut self) -> Option<anyhow::Error> {
         let transactions = match find_all_resources_where_fields!(
             Transaction,
-            vec![("wallet_id", self.id.clone().into())]
+            vec![("wallet_id", self.id.clone().into())],
+            None,
+            None
         )
         .await
         {

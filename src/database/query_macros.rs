@@ -23,6 +23,31 @@
 #[macro_export]
 macro_rules! find_all_resources_where_fields {
     ($resource:ty, $params:expr) => {{
+        find_all_resources_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, None, None) => {{
+        find_all_resources_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, None, $order_direction:expr) => {{
+        find_all_resources_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            $order_direction
+        )
+    }};
+    ($resource:ty, $params:expr, $order_by:expr, None) => {{ find_all_resources_where_fields!($resource, $params, $order_by, Option::<String>::None) }};
+    ($resource:ty, $params:expr, $order_by:expr, $order_direction:expr) => {{
         use crate::database::{
             connection::get_connection, traits::DatabaseResource, values::DatabaseValue,
         };
@@ -57,7 +82,18 @@ macro_rules! find_all_resources_where_fields {
                     query.push_str(" AND ");
                 }
             }
-            query.push_str(" ORDER BY updated_at DESC");
+
+            let order_by = match $order_by {
+                Some(order_by) => order_by.to_string(),
+                None => "updated_at".to_string(),
+            };
+
+            let order_direction = match $order_direction {
+                Some(order_direction) => order_direction.to_string(),
+                None => "DESC".to_string(),
+            };
+
+            query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
 
             let mut query = sqlx::query(&query);
             for value in values.iter() {
@@ -94,6 +130,38 @@ macro_rules! find_all_resources_where_fields {
 #[macro_export]
 macro_rules! find_all_unarchived_resources_where_fields {
     ($resource:ty, $params:expr) => {{
+        find_all_unarchived_resources_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, None, None) => {{
+        find_all_unarchived_resources_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, None, $order_direction:expr) => {{
+        find_all_unarchived_resources_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            $order_direction
+        )
+    }};
+    ($resource:ty, $params:expr, $order_by:expr, None) => {{
+        find_all_unarchived_resources_where_fields!(
+            $resource,
+            $params,
+            $order_by,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, $order_by:expr, $order_direction:expr) => {{
         use crate::database::{
             connection::get_connection, traits::DatabaseResource, values::DatabaseValue,
         };
@@ -131,7 +199,17 @@ macro_rules! find_all_unarchived_resources_where_fields {
                 query = query.bind(value);
             }
 
-            query.push_str(" ORDER BY created_at DESC");
+            let order_by = match $order_by {
+                Some(order_by) => order_by.to_string(),
+                None => "updated_at".to_string(),
+            };
+
+            let order_direction = match $order_direction {
+                Some(order_direction) => order_direction.to_string(),
+                None => "DESC".to_string(),
+            };
+
+            query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
 
             match query.fetch_all(&pool).await {
                 Ok(rows) => rows
@@ -163,6 +241,38 @@ macro_rules! find_all_unarchived_resources_where_fields {
 #[macro_export]
 macro_rules! find_all_archived_resources_where_fields {
     ($resource:ty, $params:expr) => {{
+        find_all_archived_resources_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, None, None) => {{
+        find_all_archived_resources_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, None, $order_direction:expr) => {{
+        find_all_archived_resources_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            $order_direction
+        )
+    }};
+    ($resource:ty, $params:expr, $order_by:expr, None) => {{
+        find_all_archived_resources_where_fields!(
+            $resource,
+            $params,
+            $order_by,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, $order_by:expr, $order_direction:expr) => {{
         use crate::database::{
             connection::get_connection, traits::DatabaseResource, values::DatabaseValue,
         };
@@ -197,7 +307,17 @@ macro_rules! find_all_archived_resources_where_fields {
                 }
             }
 
-            query.push_str(" ORDER BY created_at DESC");
+            let order_by = match $order_by {
+                Some(order_by) => order_by.to_string(),
+                None => "updated_at".to_string(),
+            };
+
+            let order_direction = match $order_direction {
+                Some(order_direction) => order_direction.to_string(),
+                None => "DESC".to_string(),
+            };
+
+            query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
 
             let mut query = sqlx::query(&query);
             for (_, value) in values.iter().enumerate() {
@@ -235,6 +355,31 @@ macro_rules! find_all_archived_resources_where_fields {
 #[macro_export]
 macro_rules! find_one_resource_where_fields {
     ($resource:ty, $params:expr) => {{
+        find_one_resource_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, None, None) => {{
+        find_one_resource_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, None, $order_direction:expr) => {{
+        find_one_resource_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            $order_direction
+        )
+    }};
+    ($resource:ty, $params:expr, $order_by:expr, None) => {{ find_one_resource_where_fields!($resource, $params, $order_by, Option::<String>::None) }};
+    ($resource:ty, $params:expr, $order_by:expr, $order_direction:expr) => {{
         use crate::database::{
             connection::get_connection, traits::DatabaseResource, values::DatabaseValue,
         };
@@ -265,6 +410,7 @@ macro_rules! find_one_resource_where_fields {
                     query.push_str(" AND ");
                 }
             }
+
             query.push_str(" LIMIT 1");
 
             let mut query = sqlx::query(&query);
@@ -330,6 +476,7 @@ macro_rules! find_one_unarchived_resource_where_fields {
                     query.push_str(" AND ");
                 }
             }
+
             query.push_str(" LIMIT 1");
 
             let mut query = sqlx::query(&query);
@@ -399,6 +546,7 @@ macro_rules! find_one_archived_resource_where_fields {
                     query.push_str(" AND ");
                 }
             }
+
             query.push_str(" LIMIT 1");
 
             let mut query = sqlx::query(&query);
@@ -441,6 +589,42 @@ macro_rules! find_one_archived_resource_where_fields {
 #[macro_export]
 macro_rules! find_all_resources_where_fields_like {
     ($resource:ty, $params:expr, $search_term:expr) => {{
+        find_all_resources_where_fields_like!(
+            $resource,
+            $params,
+            $search_term,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, $search_term:expr, None, None) => {{
+        find_all_resources_where_fields_like!(
+            $resource,
+            $params,
+            $search_term,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, $search_term:expr, None, $order_direction:expr) => {{
+        find_all_resources_where_fields_like!(
+            $resource,
+            $params,
+            $search_term,
+            Option::<String>::None,
+            $order_direction
+        )
+    }};
+    ($resource:ty, $params:expr, $search_term:expr, $order_by:expr, None) => {{
+        find_all_resources_where_fields_like!(
+            $resource,
+            $params,
+            $search_term,
+            $order_by,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, $search_term:expr, $order_by:expr, $order_direction:expr) => {{
         use crate::database::{connection::get_connection, traits::DatabaseResource};
         use crate::utils::strings::camel_to_snake_case;
         use pluralizer::pluralize;
@@ -466,7 +650,17 @@ macro_rules! find_all_resources_where_fields_like {
                 }
             }
 
-            query.push_str(" ORDER BY created_at DESC");
+            let order_by = match $order_by {
+                Some(order_by) => order_by.to_string(),
+                None => "updated_at".to_string(),
+            };
+
+            let order_direction = match $order_direction {
+                Some(order_direction) => order_direction.to_string(),
+                None => "DESC".to_string(),
+            };
+
+            query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
 
             let mut query = sqlx::query(&query);
             for _ in params.iter() {

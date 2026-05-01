@@ -168,7 +168,7 @@ impl DatabaseResource for BattleStatus {
     fn from_row(row: &PgRow) -> Result<Self, Error> {
         let created_at = row.get("created_at");
         let updated_at = row.get("updated_at");
-        
+
         Ok(BattleStatus {
             id: row.get("id"),
             user_id: row.get("user_id"),

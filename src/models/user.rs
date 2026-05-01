@@ -264,7 +264,7 @@ impl User {
     }
 
     pub async fn find_all(get_relationships: bool) -> Result<Vec<Self>, anyhow::Error> {
-        let mut users = match find_all_resources_where_fields!(User, vec![]).await {
+        let mut users = match find_all_resources_where_fields!(User, vec![], None, None).await {
             Ok(users) => users,
             Err(e) => {
                 println!("[User::find_all] Failed to get users: {:?}", e);
@@ -287,7 +287,7 @@ impl User {
         params: Vec<(&str, DatabaseValue)>,
         get_relationships: bool,
     ) -> Result<Vec<Self>, anyhow::Error> {
-        let mut users = match find_all_resources_where_fields!(User, params).await {
+        let mut users = match find_all_resources_where_fields!(User, params, None, None).await {
             Ok(users) => users,
             Err(e) => {
                 println!("[User::find_all_by] Failed to get users: {:?}", e);

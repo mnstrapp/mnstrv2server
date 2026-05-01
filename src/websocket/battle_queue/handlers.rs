@@ -993,9 +993,14 @@ async fn update_battle_mnstrs(
 }
 
 async fn load_mnstrs(user_id: &String) -> Result<Vec<Mnstr>, ()> {
-    let mnstrs = Mnstr::find_all_by(vec![("user_id", user_id.clone().into())], false)
-        .await
-        .map_err(|_| ())?;
+    let mnstrs = Mnstr::find_all_by(
+        vec![("user_id", user_id.clone().into())],
+        false,
+        Option::<crate::graphql::mnstrs::queries::MnstrOrderByInput>::None,
+        Option::<crate::graphql::mnstrs::queries::MnstrOrderDirectionInput>::None,
+    )
+    .await
+    .map_err(|_| ())?;
     Ok(mnstrs)
 }
 
