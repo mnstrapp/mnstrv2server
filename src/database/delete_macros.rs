@@ -56,7 +56,6 @@ macro_rules! delete_resource_where_fields {
         use crate::database::traits::DatabaseResource;
         use crate::database::values::DatabaseValue;
         use crate::utils::strings::camel_to_snake_case;
-        use anyhow::anyhow;
         use pluralizer::pluralize;
         use time::OffsetDateTime;
 
@@ -93,6 +92,8 @@ macro_rules! delete_resource_where_fields {
                 }
             }
 
+            query.push_str(" RETURNING *");
+
             let mut query = sqlx::query(&query);
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
@@ -101,12 +102,10 @@ macro_rules! delete_resource_where_fields {
                 query = query.bind(archived_at);
             }
 
-            match query.execute(&pool).await {
-                Ok(_) => (),
-                Err(e) => return Err(anyhow!(e)),
-            };
-
-            Ok(())
+            match query.fetch_one(&pool).await {
+                Ok(row) => Ok(<$resource as DatabaseResource>::from_row(&row)?),
+                Err(e) => Err(anyhow::Error::msg(e.to_string())),
+            }
         }
     }};
     ($resource:ty, $params:expr, $permanent:expr) => {{
@@ -114,7 +113,6 @@ macro_rules! delete_resource_where_fields {
         use crate::database::traits::DatabaseResource;
         use crate::database::values::DatabaseValue;
         use crate::utils::strings::camel_to_snake_case;
-        use anyhow::anyhow;
         use pluralizer::pluralize;
         use time::OffsetDateTime;
 
@@ -156,6 +154,8 @@ macro_rules! delete_resource_where_fields {
                 }
             }
 
+            query.push_str(" RETURNING *");
+
             let mut query = sqlx::query(&query);
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
@@ -164,12 +164,10 @@ macro_rules! delete_resource_where_fields {
                 query = query.bind(archived_at);
             }
 
-            match query.execute(&pool).await {
-                Ok(_) => (),
-                Err(e) => return Err(anyhow!(e)),
-            };
-
-            Ok(())
+            match query.fetch_one(&pool).await {
+                Ok(row) => Ok(<$resource as DatabaseResource>::from_row(&row)?),
+                Err(e) => Err(anyhow::Error::msg(e.to_string())),
+            }
         }
     }};
 }

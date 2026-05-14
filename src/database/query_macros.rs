@@ -101,11 +101,11 @@ macro_rules! find_all_resources_where_fields {
             }
 
             match query.fetch_all(&pool).await {
-                Ok(rows) => rows
+                Ok(rows) => Ok(rows
                     .into_iter()
                     .map(|row| <$resource as DatabaseResource>::from_row(&row))
-                    .collect::<Result<Vec<$resource>, _>>(),
-                Err(e) => Err(e),
+                    .collect::<Result<Vec<$resource>, _>>()?),
+                Err(e) => Err(anyhow::Error::msg(e.to_string())),
             }
         }
     }};
@@ -216,7 +216,7 @@ macro_rules! find_all_unarchived_resources_where_fields {
                     .into_iter()
                     .map(|row| <$resource as DatabaseResource>::from_row(&row))
                     .collect::<Result<Vec<$resource>, _>>(),
-                Err(e) => Err(e),
+                Err(e) => Err(anyhow::Error::msg(e.to_string())),
             }
         }
     }};
@@ -329,7 +329,7 @@ macro_rules! find_all_archived_resources_where_fields {
                     .into_iter()
                     .map(|row| <$resource as DatabaseResource>::from_row(&row))
                     .collect::<Result<Vec<$resource>, _>>(),
-                Err(e) => Err(e),
+                Err(e) => Err(anyhow::Error::msg(e.to_string())),
             }
         }
     }};
@@ -419,8 +419,8 @@ macro_rules! find_one_resource_where_fields {
             }
 
             match query.fetch_one(&pool).await {
-                Ok(row) => <$resource as DatabaseResource>::from_row(&row),
-                Err(e) => Err(e),
+                Ok(row) => Ok(<$resource as DatabaseResource>::from_row(&row)?),
+                Err(e) => Err(anyhow::Error::msg(e.to_string())),
             }
         }
     }};
@@ -485,7 +485,7 @@ macro_rules! find_one_unarchived_resource_where_fields {
             }
 
             match query.fetch_one(&pool).await {
-                Ok(row) => <$resource as DatabaseResource>::from_row(&row),
+                Ok(row) => Ok(<$resource as DatabaseResource>::from_row(&row)?),
                 Err(e) => Err(e),
             }
         }
@@ -556,7 +556,7 @@ macro_rules! find_one_archived_resource_where_fields {
 
             match query.fetch_one(&pool).await {
                 Ok(row) => Ok(<$resource as DatabaseResource>::from_row(&row)?),
-                Err(e) => Err(e),
+                Err(e) => Err(anyhow::Error::msg(e.to_string())),
             }
         }
     }};
@@ -668,11 +668,70 @@ macro_rules! find_all_resources_where_fields_like {
             }
 
             match query.fetch_all(&pool).await {
-                Ok(rows) => rows
+                Ok(rows) => Ok(rows
                     .into_iter()
                     .map(|row| <$resource as DatabaseResource>::from_row(&row))
-                    .collect::<Result<Vec<$resource>, _>>(),
-                Err(e) => Err(e),
+                    .collect::<Result<Vec<$resource>, _>>()?),
+                Err(e) => Err(anyhow::Error::msg(e.to_string())),
+            }
+        }
+    }};
+}
+
+/// Finds all resources matching the specified field conditions with IN operator.
+///
+/// This macro generates a SELECT query that returns all resources where the specified field
+/// is in the list of values.
+///
+/// # Arguments
+/// * `$resource` - The resource type (must implement DatabaseResource)
+/// * `$field` - The field to check for IN condition
+/// * `$values` - Vector of values to check for IN condition
+///
+/// # Returns
+/// `Result<Vec<Resource>, Error>` - Vector of matching resources or database error
+///
+/// # Example
+/// ```rust
+/// let values = vec!["123", "456", "789"];
+/// let results = find_all_resources_where_fields_in!(User, "id", values).await?;
+/// ```
+#[macro_export]
+macro_rules! find_all_resources_where_fields_in {
+    ($resource:ty, $field:expr, $values:expr) => {{
+        use crate::database::{connection::get_connection, traits::DatabaseResource};
+        use crate::utils::strings::camel_to_snake_case;
+        use pluralizer::pluralize;
+
+        async {
+            let resource_name = pluralize(
+                camel_to_snake_case(stringify!($resource).to_string()).as_str(),
+                2,
+                false,
+            );
+            let pool = get_connection().await;
+
+            let mut query = format!("SELECT * FROM {}", resource_name);
+            query.push_str(&format!(" WHERE {} IN (", $field));
+            for (i, _) in $values.iter().enumerate() {
+                query.push_str(&format!("${}", i + 1));
+                if i < $values.len() - 1 {
+                    query.push_str(", ");
+                }
+            }
+            query.push_str(")");
+
+            let mut query = sqlx::query(&query);
+            for value in $values.iter() {
+                query = query.bind(value);
+            }
+
+            match query.fetch_all(&pool).await {
+                Ok(rows) => Ok(rows
+                    .into_iter()
+                    .map(|row| <$resource as DatabaseResource>::from_row(&row))
+                    .collect::<Result<Vec<$resource>, _>>()?),
+                Err(e) => Err(anyhow::Error::msg(e.to_string())),
             }
         }
     }};

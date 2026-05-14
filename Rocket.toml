@@ -1,4 +1,5 @@
-[global]
+[default]
 port = 8080
 address = "0.0.0.0"
 log_level = "normal"
+limits = { graphql = "1 MiB" }

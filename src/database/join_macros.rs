@@ -120,7 +120,7 @@ macro_rules! join_all_resources_where_fields_on {
                     .iter()
                     .map(|row| <$resource as DatabaseResource>::from_row(row).unwrap())
                     .collect::<Vec<$resource>>()),
-                Err(e) => Err(e),
+                Err(e) => Err(anyhow::Error::msg(e.to_string())),
             }
         }
     }};

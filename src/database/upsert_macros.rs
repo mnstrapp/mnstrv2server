@@ -1,37 +1,5 @@
-//! Insert Macros for Database Operations
-//!
-//! This module provides macros for creating new resources in the database.
-//! The macros automatically handle common fields like IDs, timestamps, and expiration dates
-//! based on the `DatabaseResource` trait implementation.
-
-/// Creates a new resource in the database.
-///
-/// This macro generates an INSERT query and automatically handles common database fields:
-/// - Generates UUID if `has_id()` returns true
-/// - Sets `created_at` timestamp if `is_creatable()` returns true
-/// - Sets `updated_at` timestamp if `is_updatable()` returns true
-/// - Sets `expires_at` timestamp (30 days from now) if `is_expirable()` returns true
-///
-/// # Arguments
-/// * `$resource` - The resource type (must implement DatabaseResource)
-/// * `$params` - Vector of `(&str, DatabaseValue)` tuples for field values
-///
-/// # Returns
-/// `Result<Resource, Error>` - The created resource or database error
-///
-/// # Example
-/// ```rust
-/// // Basic insertion
-/// let params = vec![
-///     ("email", "newuser@example.com".into()),
-///     ("phone", "1234567890".into()),
-///     ("name", "John Doe".into()),
-///     ("password_hash", "hashed_password".into())
-/// ];
-/// let new_user = insert_resource!(User, params).await?;
-/// ```
 #[macro_export]
-macro_rules! insert_resource {
+macro_rules! upsert_resource {
     ($resource:ty, $params:expr) => {{
         use crate::database::{
             connection::get_connection, traits::DatabaseResource, values::DatabaseValue,
@@ -47,17 +15,13 @@ macro_rules! insert_resource {
                 return Err(anyhow::Error::msg("No params provided"));
             }
 
-            let id = Uuid::new_v4().to_string();
-            let created_at = OffsetDateTime::now_utc();
-            let updated_at = created_at.clone();
-            let expires_at = (OffsetDateTime::now_utc() + Duration::days(30));
+            let pool = get_connection().await;
 
             let resource_name = pluralize(
                 camel_to_snake_case(stringify!($resource).to_string()).as_str(),
                 2,
                 false,
             );
-            let pool = get_connection().await;
 
             let mut params: Vec<(String, DatabaseValue)> = Vec::new();
             for (field, value) in input_params.into_iter() {
@@ -65,11 +29,7 @@ macro_rules! insert_resource {
             }
 
             if <$resource as DatabaseResource>::has_id() {
-                if let Some(idx) = params.iter().position(|(field, _)| field == "id") {
-                    params[idx] = ("id".to_string(), id.clone().into());
-                } else {
-                    params.push(("id".to_string(), id.clone().into()));
-                }
+                params.push(("id".to_string(), Uuid::new_v4().to_string().into()));
             }
 
             if <$resource as DatabaseResource>::is_creatable() {
@@ -77,15 +37,9 @@ macro_rules! insert_resource {
                     .iter()
                     .position(|(field, _)| field.contains("created_at"))
                 {
-                    params[idx] = (
-                        "created_at".to_string(),
-                        DatabaseValue::DateTime(created_at.clone().to_string()),
-                    );
+                    params[idx] = ("created_at".to_string(), OffsetDateTime::now_utc().into());
                 } else {
-                    params.push((
-                        "created_at".to_string(),
-                        DatabaseValue::DateTime(created_at.clone().to_string()),
-                    ));
+                    params.push(("created_at".to_string(), OffsetDateTime::now_utc().into()));
                 }
             }
 
@@ -94,15 +48,9 @@ macro_rules! insert_resource {
                     .iter()
                     .position(|(field, _)| field.contains("updated_at"))
                 {
-                    params[idx] = (
-                        "updated_at".to_string(),
-                        DatabaseValue::DateTime(updated_at.clone().to_string()),
-                    );
+                    params[idx] = ("updated_at".to_string(), OffsetDateTime::now_utc().into());
                 } else {
-                    params.push((
-                        "updated_at".to_string(),
-                        DatabaseValue::DateTime(updated_at.clone().to_string()),
-                    ));
+                    params.push(("updated_at".to_string(), OffsetDateTime::now_utc().into()));
                 }
             }
 
@@ -113,12 +61,12 @@ macro_rules! insert_resource {
                 {
                     params[idx] = (
                         "expires_at".to_string(),
-                        DatabaseValue::DateTime(expires_at.clone().to_string()),
+                        (OffsetDateTime::now_utc() + Duration::days(30)).into(),
                     );
                 } else {
                     params.push((
                         "expires_at".to_string(),
-                        DatabaseValue::DateTime(expires_at.clone().to_string()),
+                        (OffsetDateTime::now_utc() + Duration::days(30)).into(),
                     ));
                 }
             }
@@ -135,8 +83,8 @@ macro_rules! insert_resource {
                     query.push_str(", ");
                 }
             }
-
             query.push_str(") VALUES (");
+
             for (i, value) in values.iter().enumerate() {
                 match value {
                     DatabaseValue::None => {
@@ -151,7 +99,10 @@ macro_rules! insert_resource {
                     DatabaseValue::DateTime(_) => {
                         query.push_str(&format!("CAST(${} AS TIMESTAMP WITHOUT TIME ZONE)", i + 1));
                     }
-                    DatabaseValue::Int(_) | DatabaseValue::Int32(_) => {
+                    DatabaseValue::Int(_) => {
+                        query.push_str(&format!("CAST(${} AS INTEGER)", i + 1));
+                    }
+                    DatabaseValue::Int32(_) => {
                         query.push_str(&format!("CAST(${} AS INTEGER)", i + 1));
                     }
                     DatabaseValue::Int64(_) => {
@@ -168,26 +119,31 @@ macro_rules! insert_resource {
                     query.push_str(", ");
                 }
             }
-            query.push_str(") RETURNING *");
-
+            query.push_str(") ON CONFLICT (id) DO UPDATE SET ");
+            for (i, field) in fields.iter().enumerate() {
+                query.push_str(format!("{} = EXCLUDED.{}", field, field).as_str());
+                if i < fields.len() - 1 {
+                    query.push_str(", ");
+                }
+            }
+            query.push_str(" RETURNING *");
             let mut query = sqlx::query(&query);
             for (_, value) in values.iter().enumerate() {
-                query = query.bind(value);
+                match value {
+                    DatabaseValue::None => query = query.bind(Option::<String>::None),
+                    _ => query = query.bind(value),
+                }
             }
-
             match query.fetch_one(&pool).await {
                 Ok(row) => Ok(<$resource as DatabaseResource>::from_row(&row)?),
-                Err(e) => {
-                    println!("Error fetching row: {:?}", e);
-                    Err(anyhow::Error::msg(e.to_string()))
-                }
+                Err(e) => Err(e.into()),
             }
         }
     }};
 }
 
 #[macro_export]
-macro_rules! insert_resource_batch {
+macro_rules! upsert_resource_batch {
     ($resource:ty, $resources:expr) => {{
         use crate::database::{
             connection::get_connection, traits::DatabaseResource, values::DatabaseValue,
@@ -214,41 +170,41 @@ macro_rules! insert_resource_batch {
                 return Ok(Vec::<$resource>::new());
             }
 
-            let mut fields: Vec<&str> = resources[0]
+            let mut fields = resources[0]
                 .clone()
                 .iter()
-                .map(|(field, _)| *field)
-                .collect::<Vec<&str>>();
+                .map(|(field, _)| field.to_string())
+                .collect::<Vec<String>>();
 
             if <$resource as DatabaseResource>::has_id() {
-                if let Some(idx) = fields.iter().position(|field| field == &"id") {
-                    fields[idx] = "id";
+                if let Some(idx) = fields.iter().position(|field| field == "id") {
+                    fields[idx] = "id".to_string();
                 } else {
-                    fields.push("id");
+                    fields.push("id".to_string());
                 }
             }
 
             if <$resource as DatabaseResource>::is_creatable() {
-                if let Some(idx) = fields.iter().position(|field| field == &"created_at") {
-                    fields[idx] = "created_at";
+                if let Some(idx) = fields.iter().position(|field| field == "created_at") {
+                    fields[idx] = "created_at".to_string();
                 } else {
-                    fields.push("created_at");
+                    fields.push("created_at".to_string());
                 }
             }
 
             if <$resource as DatabaseResource>::is_updatable() {
-                if let Some(idx) = fields.iter().position(|field| field == &"updated_at") {
-                    fields[idx] = "updated_at";
+                if let Some(idx) = fields.iter().position(|field| field == "updated_at") {
+                    fields[idx] = "updated_at".to_string();
                 } else {
-                    fields.push("updated_at");
+                    fields.push("updated_at".to_string());
                 }
             }
 
             if <$resource as DatabaseResource>::is_expirable() {
-                if let Some(idx) = fields.iter().position(|field| field == &"expires_at") {
-                    fields[idx] = "expires_at";
+                if let Some(_) = fields.iter().position(|field| field == "expires_at") {
+                    fields.push("expires_at".to_string());
                 } else {
-                    fields.push("expires_at");
+                    fields.push("expires_at".to_string());
                 }
             }
 
@@ -261,11 +217,11 @@ macro_rules! insert_resource_batch {
                 }
             }
 
-            query.push_str(") VALUES ");
+            query.push_str(") VALUES (");
 
             let mut values: Vec<DatabaseValue> = Vec::new();
 
-            for (i, resource) in resources.iter().enumerate() {
+            for (idx, resource) in resources.iter().enumerate() {
                 let mut input_params: Vec<(&str, DatabaseValue)> = resource.clone();
                 if input_params.is_empty() {
                     return Err(anyhow::Error::msg("Params are empty"));
@@ -275,7 +231,7 @@ macro_rules! insert_resource_batch {
 
                 if <$resource as DatabaseResource>::has_id() {
                     if let None = input_params.iter().position(|(field, _)| field == &"id") {
-                        input_params[i] = ("id", id.clone().into());
+                        input_params[idx] = ("id", id.clone().into());
                     } else {
                         input_params.push(("id", id.clone().into()));
                     }
@@ -286,15 +242,9 @@ macro_rules! insert_resource_batch {
                         .iter()
                         .position(|(field, _)| field == &"created_at")
                     {
-                        input_params[i] = (
-                            "created_at",
-                            DatabaseValue::DateTime(created_at.clone().to_string()),
-                        );
+                        input_params[idx] = ("created_at", created_at.clone().into());
                     } else {
-                        input_params.push((
-                            "created_at",
-                            DatabaseValue::DateTime(created_at.clone().to_string()),
-                        ));
+                        input_params.push(("created_at", created_at.clone().into()));
                     }
                 }
 
@@ -303,15 +253,9 @@ macro_rules! insert_resource_batch {
                         .iter()
                         .position(|(field, _)| field == &"updated_at")
                     {
-                        input_params[i] = (
-                            "updated_at",
-                            DatabaseValue::DateTime(updated_at.clone().to_string()),
-                        );
+                        input_params[idx] = ("updated_at", updated_at.clone().into());
                     } else {
-                        input_params.push((
-                            "updated_at",
-                            DatabaseValue::DateTime(updated_at.clone().to_string()),
-                        ));
+                        input_params.push(("updated_at", updated_at.clone().into()));
                     }
                 }
 
@@ -320,20 +264,14 @@ macro_rules! insert_resource_batch {
                         .iter()
                         .position(|(field, _)| field == &"expires_at")
                     {
-                        input_params[i] = (
-                            "expires_at",
-                            DatabaseValue::DateTime(expires_at.clone().to_string()),
-                        );
+                        input_params[idx] = ("expires_at", expires_at.clone().into());
                     } else {
-                        input_params.push((
-                            "expires_at",
-                            DatabaseValue::DateTime(expires_at.clone().to_string()),
-                        ));
+                        input_params.push(("expires_at", expires_at.clone().into()));
                     }
                 }
 
                 let mut idxs: Vec<usize> = Vec::new();
-                for (_, value) in input_params.clone() {
+                for (_, value) in input_params {
                     values.push(value.clone());
                     idxs.push(values.len() - 1);
                 }
@@ -342,7 +280,7 @@ macro_rules! insert_resource_batch {
 
                 for (j, _) in fields.iter().enumerate() {
                     let idx = idxs[j];
-                    let value = input_params[j].1.clone();
+                    let value = resource[idx].1.clone();
                     match value {
                         DatabaseValue::None => {
                             value_query.push_str("NULL");
@@ -371,15 +309,20 @@ macro_rules! insert_resource_batch {
                             value_query.push_str(&format!("CAST(${} AS BOOLEAN)", idx));
                         }
                     }
-                    if idx < resources.len() - 1 {
-                        value_query.push_str(", ");
-                    }
                     value_query.push_str(")");
-                    if i < resources.len() - 1 {
+                    if idx < resources.len() - 1 {
                         value_query.push_str(", ");
                     }
                 }
                 query.push_str(&value_query);
+            }
+
+            query.push_str(") ON CONFLICT (id) DO UPDATE SET ");
+            for (i, field) in fields.iter().enumerate() {
+                query.push_str(format!("{} = EXCLUDED.{}", field, field).as_str());
+                if i < fields.len() - 1 {
+                    query.push_str(", ");
+                }
             }
             query.push_str(" RETURNING *");
 
@@ -387,7 +330,6 @@ macro_rules! insert_resource_batch {
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
             }
-
             match query.fetch_all(&pool).await {
                 Ok(rows) => Ok(rows
                     .into_iter()

@@ -8,9 +8,9 @@ use crate::{
     database::{traits::DatabaseResource, values::DatabaseValue},
     delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
     graphql::mnstrs::queries::{MnstrOrderByInput, MnstrOrderDirectionInput},
-    insert_resource,
+    insert_resource, insert_resource_batch,
     models::{generated::mnstr_xp::XP_FOR_LEVEL, user::User},
-    update_resource,
+    update_resource, update_resource_batch, upsert_resource, upsert_resource_batch,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
 
@@ -218,6 +218,61 @@ impl Mnstr {
         None
     }
 
+    pub async fn create_batch(
+        user_id: String,
+        mnstrs: Vec<Vec<(&str, Option<DatabaseValue>)>>,
+    ) -> Result<Vec<Mnstr>, anyhow::Error> {
+        if mnstrs.is_empty() {
+            return Err(anyhow::Error::msg("No mnstrs to create"));
+        }
+
+        let mut user = match User::find_one(user_id.clone(), false).await {
+            Ok(user) => user,
+            Err(e) => {
+                println!("[Mnstr::create_batch] Failed to get user: {:?}", e);
+                return Err(e.into());
+            }
+        };
+
+        let xp = XP_FOR_LEVEL[user.experience_level as usize];
+        println!("[Mnstr::create_batch] XP: {:?}", xp);
+        if let Some(error) = user.update_xp(xp).await {
+            println!(
+                "[Mnstr::create_batch] Failed to update user xp: {:?}",
+                error
+            );
+            return Err(error.into());
+        }
+
+        let mut params: Vec<Vec<(&str, DatabaseValue)>> = Vec::new();
+        for mnstr in mnstrs.iter() {
+            let mut mnstr_params: Vec<(&str, DatabaseValue)> = Vec::new();
+            for (field, value) in mnstr.iter() {
+                if let Some(v) = value {
+                    mnstr_params.push((*field, v.clone().into()));
+                }
+            }
+            params.push(mnstr_params);
+        }
+
+        match insert_resource_batch!(Mnstr, params).await {
+            Ok(mut results) => {
+                for mnstr in results.iter_mut() {
+                    if let Some(error) = user.add_coins(mnstr.coins()).await {
+                        println!("[Mnstr::create_batch] Failed to add coins: {:?}", error);
+                        return Err(error.into());
+                    }
+                    mnstr.update_experience_to_next_level();
+                }
+                Ok(results)
+            }
+            Err(e) => {
+                println!("[Mnstr::create_batch] Failed to create mnstrs: {:?}", e);
+                return Err(e.into());
+            }
+        }
+    }
+
     pub async fn update(&mut self) -> Option<anyhow::Error> {
         let params = vec![
             ("mnstr_name", self.mnstr_name.clone().into()),
@@ -252,6 +307,59 @@ impl Mnstr {
         self.update_experience_to_next_level();
 
         None
+    }
+
+    pub async fn update_batch(
+        mnstrs: Vec<Vec<(&str, Option<DatabaseValue>)>>,
+    ) -> Result<Vec<Mnstr>, anyhow::Error> {
+        if mnstrs.is_empty() {
+            return Err(anyhow::Error::msg("No mnstrs to update"));
+        }
+
+        let mut params: Vec<Vec<(&str, DatabaseValue)>> = Vec::new();
+        let mut new_mnstrs: Vec<Vec<(&str, DatabaseValue)>> = Vec::new();
+
+        for mnstr in mnstrs.iter() {
+            let mut mnstr_params: Vec<(&str, DatabaseValue)> = Vec::new();
+            for (field, value) in mnstr.iter() {
+                if let Some(v) = value {
+                    mnstr_params.push((*field, v.clone().into()));
+                }
+            }
+
+            if let None = mnstr.iter().find(|(field, _)| field == &"id") {
+                new_mnstrs.push(mnstr_params);
+                continue;
+            }
+
+            params.push(mnstr_params);
+        }
+
+        let mut results: Vec<Mnstr> = Vec::new();
+
+        if !new_mnstrs.is_empty() {
+            let new_results = match insert_resource_batch!(Mnstr, new_mnstrs).await {
+                Ok(results) => results,
+                Err(e) => {
+                    println!("[Mnstr::update_batch] Failed to create mnstrs: {:?}", e);
+                    return Err(e.into());
+                }
+            };
+            results.extend(new_results);
+        }
+
+        if !params.is_empty() {
+            let updated_results = match update_resource_batch!(Mnstr, params).await {
+                Ok(results) => results,
+                Err(e) => {
+                    println!("[Mnstr::update_batch] Failed to update mnstrs: {:?}", e);
+                    return Err(e.into());
+                }
+            };
+            results.extend(updated_results);
+        }
+
+        Ok(results)
     }
 
     pub async fn update_with_defaults(&mut self) -> Option<anyhow::Error> {
@@ -419,7 +527,6 @@ impl Mnstr {
             }
 
             mnstr.update_experience_to_next_level();
-            println!("[Mnstr::find_all_by] Mnstr: {:?}", mnstr);
 
             if get_relationships {
                 if let Some(error) = mnstr.get_relationships().await {

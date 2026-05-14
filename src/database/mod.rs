@@ -20,6 +20,7 @@
 //! - `query_macros.rs` - Macros for finding and retrieving resources
 //! - `insert_macros.rs` - Macros for creating new resources
 //! - `update_macros.rs` - Macros for updating existing resources
+//! - `upsert_macros.rs` - Macros for upserting resources
 //! - `delete_macros.rs` - Macros for deleting resources (soft/hard delete)
 //! - `join_macros.rs` - Macros for complex queries with table joins
 //!
@@ -103,4 +104,5 @@ pub mod join_macros;
 pub mod query_macros;
 pub mod traits;
 pub mod update_macros;
+pub mod upsert_macros;
 pub mod values;
