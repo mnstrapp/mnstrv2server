@@ -312,10 +312,7 @@ impl Mnstr {
     pub async fn update_batch(
         mnstrs: Vec<Vec<(&str, Option<DatabaseValue>)>>,
     ) -> Result<Vec<Mnstr>, anyhow::Error> {
-        if mnstrs.is_empty() {
-            return Err(anyhow::Error::msg("No mnstrs to update"));
-        }
-
+        let mut results: Vec<Mnstr> = Vec::new();
         let mut params: Vec<Vec<(&str, DatabaseValue)>> = Vec::new();
         let mut new_mnstrs: Vec<Vec<(&str, DatabaseValue)>> = Vec::new();
 
@@ -335,7 +332,7 @@ impl Mnstr {
             params.push(mnstr_params);
         }
 
-        let mut results: Vec<Mnstr> = Vec::new();
+        // TODO: use upsert_resource_batch! macro instead of insert_resource_batch! and update_resource_batch!
 
         if !new_mnstrs.is_empty() {
             let new_results = match insert_resource_batch!(Mnstr, new_mnstrs).await {
