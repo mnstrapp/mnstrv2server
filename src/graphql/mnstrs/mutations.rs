@@ -325,13 +325,15 @@ pub async fn update_batch(
     if let None = ctx.session {
         return Err(FieldError::from("Invalid session"));
     }
+    let session = ctx.session.as_ref().unwrap().clone();
+    let user_id = session.user_id.clone();
 
     let mnstrs = mnstr_inputs
         .iter()
         .map(|mnstr_input| {
             let mut mnstr_params: Vec<(&str, Option<DatabaseValue>)> = Vec::new();
             mnstr_params.push(("id", mnstr_input.id.as_ref().map(|s| s.into())));
-            mnstr_params.push(("user_id", Some(mnstr_input.user_id.clone().into())));
+            mnstr_params.push(("user_id", Some(user_id.clone().into())));
             mnstr_params.push((
                 "mnstr_name",
                 mnstr_input.mnstr_name.as_ref().map(|s| s.into()),
