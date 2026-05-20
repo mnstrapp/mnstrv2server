@@ -6,7 +6,8 @@ use time::OffsetDateTime;
 
 use crate::{
     database::{traits::DatabaseResource, values::DatabaseValue},
-    delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
+    delete_resource_where_fields, find_all_resources_where_fields,
+    find_all_resources_where_fields_in, find_one_resource_where_fields,
     graphql::mnstrs::queries::{MnstrOrderByInput, MnstrOrderDirectionInput},
     insert_resource, insert_resource_batch,
     models::{generated::mnstr_xp::XP_FOR_LEVEL, user::User},
@@ -316,21 +317,40 @@ impl Mnstr {
         let mut params: Vec<Vec<(&str, DatabaseValue)>> = Vec::new();
         let mut new_mnstrs: Vec<Vec<(&str, DatabaseValue)>> = Vec::new();
 
+        let qr_codes = mnstrs
+            .iter()
+            .map(|mnstr| {
+                mnstr
+                    .iter()
+                    .find(|(field, _)| field == &"mnstr_qr_code")
+                    .unwrap()
+                    .1
+                    .clone()
+            })
+            .collect::<Vec<Option<DatabaseValue>>>();
+        let found_mnstrs =
+            match find_all_resources_where_fields_in!(Mnstr, "mnstr_qr_code", qr_codes).await {
+                Ok(found_mnstrs) => Some(found_mnstrs),
+                Err(_) => None,
+            };
+
         for mnstr in mnstrs.iter() {
-            let found_mnstr = Mnstr::find_one_by(
-                vec![(
-                    "qr_code",
-                    mnstr
-                        .iter()
-                        .find(|(field, _)| field == &"qr_code")
+            let qr_code = mnstr.iter().find(|(field, _)| field == &"mnstr_qr_code");
+
+            let mut found_mnstr = None;
+
+            if qr_code.is_some() && found_mnstrs.is_some() {
+                let qr_code: String = (qr_code.as_ref().unwrap().1.clone().unwrap()).into();
+                found_mnstr = Some(
+                    found_mnstrs
+                        .as_ref()
                         .unwrap()
-                        .1
-                        .clone()
-                        .into(),
-                )],
-                false,
-            )
-            .await;
+                        .iter()
+                        .find(|mnstr| mnstr.mnstr_qr_code == qr_code)
+                        .unwrap(),
+                );
+            }
+
             let mut mnstr_params: Vec<(&str, DatabaseValue)> = Vec::new();
             for (field, value) in mnstr.iter() {
                 if let Some(v) = value {
@@ -338,7 +358,7 @@ impl Mnstr {
                 }
             }
 
-            if let Err(_) = found_mnstr {
+            if let None = found_mnstr {
                 let id_idx = mnstr_params.iter().position(|(field, _)| field == &"id");
                 if let Some(idx) = id_idx {
                     mnstr_params.remove(idx);

@@ -230,3 +230,12 @@ impl<T: Into<DatabaseValue>> From<Option<T>> for DatabaseValue {
         option.unwrap().into()
     }
 }
+
+impl From<DatabaseValue> for String {
+    fn from(value: DatabaseValue) -> Self {
+        match value {
+            DatabaseValue::String(s) => s,
+            _ => "".to_string(),
+        }
+    }
+}
