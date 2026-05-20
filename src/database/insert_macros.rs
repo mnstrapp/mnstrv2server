@@ -374,10 +374,10 @@ macro_rules! insert_resource_batch {
                     if idx < resources.len() - 1 {
                         value_query.push_str(", ");
                     }
-                    value_query.push_str(")");
-                    if i < resources.len() - 1 {
-                        value_query.push_str(", ");
-                    }
+                }
+                value_query.push_str(")");
+                if i < resources.len() - 1 {
+                    value_query.push_str(", ");
                 }
                 query.push_str(&value_query);
             }
