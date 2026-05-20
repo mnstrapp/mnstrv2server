@@ -382,6 +382,7 @@ macro_rules! insert_resource_batch {
                 query.push_str(&value_query);
             }
             query.push_str(" RETURNING *");
+            println!("{}", query);
 
             let mut query = sqlx::query(&query);
             for (_, value) in values.iter().enumerate() {
