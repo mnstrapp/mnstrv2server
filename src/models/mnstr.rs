@@ -317,6 +317,20 @@ impl Mnstr {
         let mut new_mnstrs: Vec<Vec<(&str, DatabaseValue)>> = Vec::new();
 
         for mnstr in mnstrs.iter() {
+            let found_mnstr = Mnstr::find_one_by(
+                vec![(
+                    "qr_code",
+                    mnstr
+                        .iter()
+                        .find(|(field, _)| field == &"qr_code")
+                        .unwrap()
+                        .1
+                        .clone()
+                        .into(),
+                )],
+                false,
+            )
+            .await;
             let mut mnstr_params: Vec<(&str, DatabaseValue)> = Vec::new();
             for (field, value) in mnstr.iter() {
                 if let Some(v) = value {
@@ -324,7 +338,11 @@ impl Mnstr {
                 }
             }
 
-            if let None = mnstr.iter().find(|(field, _)| field == &"id") {
+            if let Err(_) = found_mnstr {
+                let id_idx = mnstr_params.iter().position(|(field, _)| field == &"id");
+                if let Some(idx) = id_idx {
+                    mnstr_params.remove(idx);
+                }
                 new_mnstrs.push(mnstr_params);
                 continue;
             }
