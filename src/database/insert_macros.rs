@@ -274,19 +274,19 @@ macro_rules! insert_resource_batch {
                 let id = Uuid::new_v4().to_string();
 
                 if <$resource as DatabaseResource>::has_id() {
-                    if let None = input_params.iter().position(|(field, _)| field == &"id") {
-                        input_params[i] = ("id", id.clone().into());
+                    if let Some(idx) = input_params.iter().position(|(field, _)| field == &"id") {
+                        input_params[idx] = ("id", id.clone().into());
                     } else {
                         input_params.push(("id", id.clone().into()));
                     }
                 }
 
                 if <$resource as DatabaseResource>::is_creatable() {
-                    if let None = input_params
+                    if let Some(idx) = input_params
                         .iter()
                         .position(|(field, _)| field == &"created_at")
                     {
-                        input_params[i] = (
+                        input_params[idx] = (
                             "created_at",
                             DatabaseValue::DateTime(created_at.clone().to_string()),
                         );
@@ -299,11 +299,11 @@ macro_rules! insert_resource_batch {
                 }
 
                 if <$resource as DatabaseResource>::is_updatable() {
-                    if let None = input_params
+                    if let Some(idx) = input_params
                         .iter()
                         .position(|(field, _)| field == &"updated_at")
                     {
-                        input_params[i] = (
+                        input_params[idx] = (
                             "updated_at",
                             DatabaseValue::DateTime(updated_at.clone().to_string()),
                         );
@@ -316,11 +316,11 @@ macro_rules! insert_resource_batch {
                 }
 
                 if <$resource as DatabaseResource>::is_expirable() {
-                    if let None = input_params
+                    if let Some(idx) = input_params
                         .iter()
                         .position(|(field, _)| field == &"expires_at")
                     {
-                        input_params[i] = (
+                        input_params[idx] = (
                             "expires_at",
                             DatabaseValue::DateTime(expires_at.clone().to_string()),
                         );
@@ -335,7 +335,7 @@ macro_rules! insert_resource_batch {
                 let mut idxs: Vec<usize> = Vec::new();
                 for (_, value) in input_params.clone() {
                     values.push(value.clone());
-                    idxs.push(values.len() - 1);
+                    idxs.push(values.len());
                 }
 
                 let mut value_query = String::from("(");
