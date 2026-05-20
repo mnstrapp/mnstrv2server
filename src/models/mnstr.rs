@@ -341,14 +341,15 @@ impl Mnstr {
 
             if qr_code.is_some() && found_mnstrs.is_some() {
                 let qr_code: String = (qr_code.as_ref().unwrap().1.clone().unwrap()).into();
-                found_mnstr = Some(
-                    found_mnstrs
-                        .as_ref()
-                        .unwrap()
-                        .iter()
-                        .find(|mnstr| mnstr.mnstr_qr_code == qr_code)
-                        .unwrap(),
-                );
+                found_mnstr = match found_mnstrs
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .find(|mnstr| mnstr.mnstr_qr_code == qr_code)
+                {
+                    Some(mnstr) => Some(mnstr.clone()),
+                    None => None,
+                };
             }
 
             let mut mnstr_params: Vec<(&str, DatabaseValue)> = Vec::new();
