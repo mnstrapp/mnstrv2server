@@ -371,7 +371,7 @@ macro_rules! insert_resource_batch {
                             value_query.push_str(&format!("CAST(${} AS BOOLEAN)", idx));
                         }
                     }
-                    if idx < resources.len() - 1 {
+                    if j < fields.len() - 1 {
                         value_query.push_str(", ");
                     }
                 }
