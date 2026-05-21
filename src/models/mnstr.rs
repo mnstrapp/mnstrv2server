@@ -311,6 +311,7 @@ impl Mnstr {
     }
 
     pub async fn update_batch(
+        user_id: String,
         mnstrs: Vec<Vec<(&str, Option<DatabaseValue>)>>,
     ) -> Result<Vec<Mnstr>, anyhow::Error> {
         let mut results: Vec<Mnstr> = Vec::new();
@@ -345,7 +346,7 @@ impl Mnstr {
                     .as_ref()
                     .unwrap()
                     .iter()
-                    .find(|mnstr| mnstr.mnstr_qr_code == qr_code)
+                    .find(|mnstr| mnstr.mnstr_qr_code == qr_code && mnstr.user_id == user_id)
                 {
                     Some(mnstr) => Some(mnstr.clone()),
                     None => None,

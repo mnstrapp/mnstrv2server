@@ -385,7 +385,7 @@ pub async fn update_batch(
         })
         .collect::<Vec<Vec<(&str, Option<DatabaseValue>)>>>();
 
-    let mnstrs = match Mnstr::update_batch(mnstrs).await {
+    let mnstrs = match Mnstr::update_batch(user_id, mnstrs).await {
         Ok(mnstrs) => mnstrs,
         Err(e) => {
             println!("[update_batch] Failed to update mnstrs: {:?}", e);
