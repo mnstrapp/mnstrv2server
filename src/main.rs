@@ -4,11 +4,13 @@ extern crate rocket;
 use rocket_cors::CorsOptions;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
+
 mod database;
 mod graphql;
 mod models;
 mod utils;
 mod websocket;
+mod battle;
 
 #[get("/")]
 fn index() -> &'static str {

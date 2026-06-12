@@ -4,6 +4,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
+    graphql::mnstrs::queries::{MnstrOrderByInput, MnstrOrderDirectionInput},
     models::mnstr::Mnstr,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
@@ -179,6 +180,25 @@ impl BattleQueue {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct SortMnstrsInput {
+    pub sort_by: Option<MnstrOrderByInput>,
+    pub sort_direction: Option<MnstrOrderDirectionInput>,
+}
+
+impl SortMnstrsInput {
+    pub fn new(
+        sort_by: Option<MnstrOrderByInput>,
+        sort_direction: Option<MnstrOrderDirectionInput>,
+    ) -> Self {
+        Self {
+            sort_by,
+            sort_direction,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum BattleQueueDataAction {
     Connect,
     Cancel,
@@ -202,6 +222,7 @@ pub enum BattleQueueDataAction {
     Defend,
     Magic,
     Escape,
+    SortMnstrs(SortMnstrsInput),
 }
 
 impl From<String> for BattleQueueDataAction {

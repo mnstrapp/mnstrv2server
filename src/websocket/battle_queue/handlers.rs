@@ -17,7 +17,7 @@ use crate::{
     websocket::{
         battle_queue::models::{
             BattleLogData, BattleQueue, BattleQueueAction, BattleQueueChannel, BattleQueueData,
-            BattleQueueDataAction, BattleQueueGameData,
+            BattleQueueDataAction, BattleQueueGameData, SortMnstrsInput,
         },
         helpers::verify_session_token,
     },
@@ -403,6 +403,24 @@ async fn handle_incoming_ws_message(
                     ),
                 }
             }
+            BattleQueueDataAction::SortMnstrs(sort_mnstrs_input) => {
+                match handle_sort_mnstrs_request(session_user_id, user_name, &sort_mnstrs_input)
+                    .await
+                {
+                    Ok(payload) => Some(payload),
+                    Err(_) => Some(
+                        serde_json::to_string(&build_error(
+                            Some(session_user_id.clone()),
+                            user_name.clone(),
+                            BattleQueueChannel::Lobby,
+                            BattleQueueAction::Error,
+                            BattleQueueDataAction::SortMnstrs(sort_mnstrs_input),
+                            "Error sorting mnstrs".to_string(),
+                        ))
+                        .unwrap(),
+                    ),
+                }
+            }
             BattleQueueDataAction::Accept => {
                 if let Err(_) =
                     handle_accept_challenge(&queue, session_user_id, user_name, connection).await
@@ -749,6 +767,45 @@ async fn handle_list_request(
     Ok(serde_json::to_string(&battle_queue).unwrap())
 }
 
+async fn handle_sort_mnstrs_request(
+    requester_user_id: &String,
+    user_name: &Option<String>,
+    sort_mnstrs_input: &SortMnstrsInput,
+) -> Result<String, anyhow::Error> {
+    println!(
+        "[handle_sort_mnstrs_request] Sort mnstrs user_id: {:?}, input: {:?}",
+        requester_user_id, sort_mnstrs_input
+    );
+    let params = vec![("user_id", requester_user_id.clone().into())];
+    let mnstrs = match Mnstr::find_all_by(
+        params,
+        false,
+        sort_mnstrs_input.sort_by,
+        sort_mnstrs_input.sort_direction,
+    )
+    .await
+    {
+        Ok(mnstrs) => mnstrs,
+        Err(err) => {
+            println!(
+                "[handle_sort_mnstrs_request] Error finding mnstrs: {:?}",
+                err
+            );
+            return Err(err.into());
+        }
+    };
+    let mut battle_queue = build_success(
+        Some(requester_user_id.clone()),
+        user_name.clone(),
+        BattleQueueChannel::Lobby,
+        BattleQueueAction::List,
+        BattleQueueDataAction::List,
+        "List of mnstrs".to_string(),
+    );
+    battle_queue.data.data = Some(serde_json::to_string(&mnstrs).unwrap());
+    Ok(serde_json::to_string(&battle_queue).unwrap())
+}
+
 async fn handle_accept_challenge(
     queue: &BattleQueue,
     session_user_id: &String,
@@ -1055,15 +1112,6 @@ async fn handle_attack(
         defender = opponent.clone();
     }
 
-    let attacker_roll = roll_dice(20)
-        + (attacker.current_speed / 20) as i32
-        + (attacker.current_attack / 20) as i32;
-    let defender_roll = roll_dice(20)
-        + (defender.current_intelligence / 20) as i32
-        + (defender.current_defense / 20) as i32;
-
-    let difference = attacker_roll - defender_roll;
-
     let mut battle_log_data = BattleLogData {
         missed: None,
         hit: None,
@@ -1073,22 +1121,20 @@ async fn handle_attack(
 
     let battle_log_action;
 
-    if difference > 0 {
-        if difference > defender.current_defense {
-            defender.current_health = 0;
-        } else {
-            defender.current_health -= difference;
+    match crate::battle::physical::attack(&mut attacker, &mut defender) {
+        (true, damage) => {
+            battle_log_data.hit = Some(true);
+            battle_log_data.damage = Some(damage);
+            battle_log_action = BattleLogAction::Hit;
+            println!("[handle_attack] Hit! {:?}", damage);
         }
-
-        battle_log_data.hit = Some(true);
-        battle_log_data.damage = Some(difference);
-        battle_log_action = BattleLogAction::Hit;
-        println!("[handle_attack] Hit! {:?}", difference);
-    } else {
-        battle_log_data.missed = Some(true);
-        battle_log_action = BattleLogAction::Missed;
-        println!("[handle_attack] Missed");
+        (false, _) => {
+            battle_log_data.missed = Some(true);
+            battle_log_action = BattleLogAction::Missed;
+            println!("[handle_attack] Missed");
+        }
     }
+
     battle_game_data.battle_log_data = Some(battle_log_data.clone());
 
     let battle_log_data = serde_json::to_string(&battle_log_data).unwrap();
@@ -1195,12 +1241,7 @@ async fn handle_defend(
         attacker = opponent.clone();
     }
 
-    let mut defense = roll_dice(20);
-    if (defense + attacker.current_defense) >= attacker.max_defense {
-        defense = attacker.max_defense;
-    }
-    attacker.current_defense += defense;
-    attacker.current_intelligence += defense;
+    let defense = crate::battle::defend::rest(&mut attacker);
 
     let battle_log_data = BattleLogData {
         missed: None,
@@ -1291,10 +1332,6 @@ async fn handle_magic(
         defender = opponent.clone();
     }
 
-    let attacker_roll = roll_dice(20) + (attacker.current_magic / 20) as i32;
-    let defender_roll = roll_dice(20) + (defender.current_magic / 20) as i32;
-    let difference = attacker_roll - defender_roll;
-
     let mut battle_log_data = BattleLogData {
         missed: None,
         hit: None,
@@ -1304,21 +1341,18 @@ async fn handle_magic(
 
     let battle_log_action;
 
-    if difference > 0 {
-        if difference > defender.current_health {
-            defender.current_health = 0;
-        } else {
-            defender.current_health -= difference;
+    match crate::battle::magic::attack(&mut attacker, &mut defender) {
+        (true, damage) => {
+            battle_log_data.hit = Some(true);
+            battle_log_data.damage = Some(damage);
+            battle_log_action = BattleLogAction::Hit;
+            println!("[handle_magic] Hit! {:?}", damage);
         }
-
-        battle_log_data.hit = Some(true);
-        battle_log_data.damage = Some(difference);
-        battle_log_action = BattleLogAction::Hit;
-        println!("[handle_attack] Hit! {:?}", difference);
-    } else {
-        battle_log_data.missed = Some(true);
-        battle_log_action = BattleLogAction::Missed;
-        println!("[handle_attack] Missed");
+        (false, _) => {
+            battle_log_data.missed = Some(true);
+            battle_log_action = BattleLogAction::Missed;
+            println!("[handle_magic] Missed");
+        }
     }
 
     battle_game_data.battle_log_data = Some(battle_log_data.clone());
@@ -1344,16 +1378,6 @@ async fn handle_magic(
             "Error creating battle log".to_string(),
         );
         return Some(error_queue);
-    }
-
-    attacker.current_magic -= 1;
-    defender.current_magic -= 1;
-
-    if attacker.current_magic <= 0 {
-        attacker.current_magic = 0;
-    }
-    if defender.current_magic <= 0 {
-        defender.current_magic = 0;
     }
 
     println!("[handle_attack] Updating attacker");
@@ -1405,10 +1429,6 @@ async fn handle_magic(
         queue.data.data = Some(serde_json::to_string(&battle_game_data).unwrap());
     }
     None
-}
-
-fn roll_dice(number: i32) -> i32 {
-    rand::rng().random_range(1..(number + 1))
 }
 
 async fn handle_game_ended(

@@ -1,8 +1,9 @@
 use juniper::{FieldError, GraphQLEnum};
+use serde::{Deserialize, Serialize};
 
 use crate::{graphql::Ctx, models::mnstr::Mnstr};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GraphQLEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GraphQLEnum, Serialize, Deserialize)]
 pub enum MnstrOrderByInput {
     CreatedAt,
     UpdatedAt,
@@ -33,6 +34,22 @@ impl MnstrOrderByInput {
             MnstrOrderByInput::Magic => "max_magic".to_string(),
         }
     }
+    pub fn from_string(value: &str) -> Option<Self> {
+        match value {
+            "created_at" => Some(MnstrOrderByInput::CreatedAt),
+            "updated_at" => Some(MnstrOrderByInput::UpdatedAt),
+            "mnstr_name" => Some(MnstrOrderByInput::Name),
+            "current_level" => Some(MnstrOrderByInput::Level),
+            "current_experience" => Some(MnstrOrderByInput::Experience),
+            "max_health" => Some(MnstrOrderByInput::Health),
+            "max_attack" => Some(MnstrOrderByInput::Attack),
+            "max_defense" => Some(MnstrOrderByInput::Defense),
+            "max_speed" => Some(MnstrOrderByInput::Speed),
+            "max_intelligence" => Some(MnstrOrderByInput::Intelligence),
+            "max_magic" => Some(MnstrOrderByInput::Magic),
+            _ => None,
+        }
+    }
 }
 
 impl Default for MnstrOrderByInput {
@@ -41,7 +58,7 @@ impl Default for MnstrOrderByInput {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GraphQLEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GraphQLEnum, Serialize, Deserialize)]
 pub enum MnstrOrderDirectionInput {
     Asc,
     Desc,
@@ -52,6 +69,13 @@ impl MnstrOrderDirectionInput {
         match self {
             MnstrOrderDirectionInput::Asc => "asc".to_string(),
             MnstrOrderDirectionInput::Desc => "desc".to_string(),
+        }
+    }
+    pub fn from_string(value: &str) -> Option<Self> {
+        match value {
+            "asc" => Some(MnstrOrderDirectionInput::Asc),
+            "desc" => Some(MnstrOrderDirectionInput::Desc),
+            _ => None,
         }
     }
 }
