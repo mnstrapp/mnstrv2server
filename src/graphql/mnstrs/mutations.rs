@@ -2,7 +2,7 @@ use juniper::{FieldError, GraphQLInputObject};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
-use crate::{database::values::DatabaseValue, graphql::Ctx, models::mnstr::Mnstr};
+use crate::{database::values::DatabaseValue, graphql::Ctx, models::{mnstr::{DEFAULT_STAT_VALUE, Mnstr}, session::Session}, utils::sessions::{get_user_from_token}};
 
 #[derive(Debug, Serialize, Deserialize, GraphQLInputObject, Clone)]
 pub struct BatchMnstrInput {
@@ -137,12 +137,19 @@ pub async fn collect(ctx: &Ctx, mnstr_qr_code: String) -> Result<Mnstr, FieldErr
         return Err(FieldError::from("Invalid session"));
     }
     let session = ctx.session.as_ref().unwrap().clone();
+    let user = match get_user_from_token::<Session>(session.session_token.clone()).await {
+        Ok(user) => user,
+        Err(e) => {
+            println!("[collect] Failed to get user: {:?}", e);
+            return Err(FieldError::from("Failed to get user"));
+        }
+    };
 
     let mut mnstr = Mnstr::new(
-        session.user_id.clone(),
-        String::new(),
-        String::new(),
-        mnstr_qr_code.clone(),
+        user.id.clone(),
+        None,
+        None,
+        mnstr_qr_code,
     );
 
     if let Some(error) = mnstr.create().await {
@@ -175,26 +182,33 @@ pub async fn create(
         return Err(FieldError::from("Invalid session"));
     }
     let session = ctx.session.as_ref().unwrap().clone();
+    let user = match get_user_from_token::<Session>(session.session_token.clone()).await {
+        Ok(user) => user,
+        Err(e) => {
+            println!("[create] Failed to get user: {:?}", e);
+            return Err(FieldError::from("Failed to get user"));
+        }
+    };
 
     let mut mnstr = Mnstr::new(
-        session.user_id.clone(),
-        mnstr_name.unwrap_or(String::new()),
-        mnstr_description.unwrap_or(String::new()),
+        user.id.clone(),
+        mnstr_name,
+        mnstr_description,
         mnstr_qr_code.unwrap_or(String::new()),
     );
 
-    mnstr.current_health = current_health.unwrap_or(10) as i32;
-    mnstr.max_health = max_health.unwrap_or(10) as i32;
-    mnstr.current_attack = current_attack.unwrap_or(10) as i32;
-    mnstr.max_attack = max_attack.unwrap_or(10) as i32;
-    mnstr.current_defense = current_defense.unwrap_or(10) as i32;
-    mnstr.max_defense = max_defense.unwrap_or(10) as i32;
-    mnstr.current_speed = current_speed.unwrap_or(10) as i32;
-    mnstr.max_speed = max_speed.unwrap_or(10) as i32;
-    mnstr.current_intelligence = current_intelligence.unwrap_or(10) as i32;
-    mnstr.max_intelligence = max_intelligence.unwrap_or(10) as i32;
-    mnstr.current_magic = current_magic.unwrap_or(10) as i32;
-    mnstr.max_magic = max_magic.unwrap_or(10) as i32;
+    mnstr.current_health = current_health.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.max_health = max_health.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.current_attack = current_attack.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.max_attack = max_attack.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.current_defense = current_defense.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.max_defense = max_defense.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.current_speed = current_speed.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.max_speed = max_speed.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.current_intelligence = current_intelligence.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.max_intelligence = max_intelligence.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.current_magic = current_magic.unwrap_or(DEFAULT_STAT_VALUE);
+    mnstr.max_magic = max_magic.unwrap_or(DEFAULT_STAT_VALUE);
 
     if let Some(error) = mnstr.create().await {
         println!("[create] Failed to create mnstr: {:?}", error);
@@ -209,12 +223,20 @@ pub async fn create_batch(ctx: &Ctx, mnstrs: Vec<MnstrInput>) -> Result<Vec<Mnst
         return Err(FieldError::from("Invalid session"));
     }
     let session = ctx.session.as_ref().unwrap().clone();
+    let user = match get_user_from_token::<Session>(session.session_token.clone()).await {
+        Ok(user) => user,
+        Err(e) => {
+            println!("[create_batch] Failed to get user: {:?}", e);
+            return Err(FieldError::from("Failed to get user"));
+        }
+    };
 
     let mnstrs = mnstrs
         .iter()
+        .filter(|mnstr_input| mnstr_input.mnstr_qr_code.is_some())
         .map(|mnstr_input| {
             let mut mnstr_params: Vec<(&str, Option<DatabaseValue>)> = Vec::new();
-            mnstr_params.push(("user_id", Some(session.user_id.clone().into())));
+            mnstr_params.push(("user_id", Some(user.id.clone().into())));
             mnstr_params.push((
                 "mnstr_name",
                 mnstr_input.mnstr_name.as_ref().map(|s| s.into()),
@@ -229,36 +251,36 @@ pub async fn create_batch(ctx: &Ctx, mnstrs: Vec<MnstrInput>) -> Result<Vec<Mnst
             ));
             mnstr_params.push((
                 "current_health",
-                mnstr_input.current_health.map(|i| i.into()),
+                mnstr_input.current_health.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into())),
             ));
-            mnstr_params.push(("max_health", mnstr_input.max_health.map(|i| i.into())));
+            mnstr_params.push(("max_health", mnstr_input.max_health.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
             mnstr_params.push((
                 "current_attack",
-                mnstr_input.current_attack.map(|i| i.into()),
+                mnstr_input.current_attack.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into())),
             ));
-            mnstr_params.push(("max_attack", mnstr_input.max_attack.map(|i| i.into())));
+            mnstr_params.push(("max_attack", mnstr_input.max_attack.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
             mnstr_params.push((
                 "current_defense",
-                mnstr_input.current_defense.map(|i| i.into()),
+                mnstr_input.current_defense.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into())),
             ));
-            mnstr_params.push(("max_defense", mnstr_input.max_defense.map(|i| i.into())));
-            mnstr_params.push(("current_speed", mnstr_input.current_speed.map(|i| i.into())));
-            mnstr_params.push(("max_speed", mnstr_input.max_speed.map(|i| i.into())));
+            mnstr_params.push(("max_defense", mnstr_input.max_defense.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
+            mnstr_params.push(("current_speed", mnstr_input.current_speed.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
+            mnstr_params.push(("max_speed", mnstr_input.max_speed.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
             mnstr_params.push((
                 "current_intelligence",
-                mnstr_input.current_intelligence.map(|i| i.into()),
+                mnstr_input.current_intelligence.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into())),
             ));
             mnstr_params.push((
                 "max_intelligence",
-                mnstr_input.max_intelligence.map(|i| i.into()),
+                mnstr_input.max_intelligence.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into())),
             ));
-            mnstr_params.push(("current_magic", mnstr_input.current_magic.map(|i| i.into())));
-            mnstr_params.push(("max_magic", mnstr_input.max_magic.map(|i| i.into())));
+            mnstr_params.push(("current_magic", mnstr_input.current_magic.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
+            mnstr_params.push(("max_magic", mnstr_input.max_magic.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
             mnstr_params
         })
         .collect::<Vec<Vec<(&str, Option<DatabaseValue>)>>>();
 
-    match Mnstr::create_batch(session.user_id.clone(), mnstrs).await {
+    match Mnstr::create_batch(user.id.clone(), mnstrs).await {
         Ok(mnstrs) => Ok(mnstrs),
         Err(e) => {
             println!("[create_batch] Failed to create mnstrs: {:?}", e);
@@ -290,9 +312,13 @@ pub async fn update(
         return Err(FieldError::from("Invalid session"));
     }
 
-    let mut mnstr = Mnstr::find_one(id, false)
-        .await
-        .map_err(|e| FieldError::from(e.to_string()))?;
+    let mut mnstr = match Mnstr::find_one(id, false).await {
+        Ok(mnstr) => mnstr,
+        Err(e) => {
+            println!("[update] Failed to find mnstr: {:?}", e);
+            return Err(FieldError::from(e.to_string()));
+        }
+    };
 
     mnstr.mnstr_name = mnstr_name.unwrap_or(mnstr.mnstr_name);
     mnstr.mnstr_description = mnstr_description.unwrap_or(mnstr.mnstr_description);
@@ -326,14 +352,21 @@ pub async fn update_batch(
         return Err(FieldError::from("Invalid session"));
     }
     let session = ctx.session.as_ref().unwrap().clone();
-    let user_id = session.user_id.clone();
+    let user = match get_user_from_token::<Session>(session.session_token.clone()).await {
+        Ok(user) => user,
+        Err(e) => {
+            println!("[update_batch] Failed to get user: {:?}", e);
+            return Err(FieldError::from("Failed to get user"));
+        }
+    };
 
     let mnstrs = mnstr_inputs
         .iter()
+        .filter(|mnstr_input| mnstr_input.mnstr_qr_code.is_some())
         .map(|mnstr_input| {
             let mut mnstr_params: Vec<(&str, Option<DatabaseValue>)> = Vec::new();
             mnstr_params.push(("id", mnstr_input.id.as_ref().map(|s| s.into())));
-            mnstr_params.push(("user_id", Some(user_id.clone().into())));
+            mnstr_params.push(("user_id", Some(user.id.clone().into())));
             mnstr_params.push((
                 "mnstr_name",
                 mnstr_input.mnstr_name.as_ref().map(|s| s.into()),
@@ -346,46 +379,43 @@ pub async fn update_batch(
                 "mnstr_qr_code",
                 mnstr_input.mnstr_qr_code.as_ref().map(|s| s.into()),
             ));
-            mnstr_params.push(("created_at", mnstr_input.created_at.map(|dt| dt.into())));
-            mnstr_params.push(("updated_at", mnstr_input.updated_at.map(|dt| dt.into())));
-            mnstr_params.push(("archived_at", mnstr_input.archived_at.map(|dt| dt.into())));
-            mnstr_params.push(("current_level", mnstr_input.current_level.map(|i| i.into())));
+            mnstr_params.push(("current_level", mnstr_input.current_level.map_or(Some(0.into()), |i| Some(i.into()))));
             mnstr_params.push((
                 "current_experience",
-                mnstr_input.current_experience.map(|i| i.into()),
+                mnstr_input.current_experience.map_or(Some(0.into()), |i| Some(i.into())),
             ));
             mnstr_params.push((
                 "current_health",
-                mnstr_input.current_health.map(|i| i.into()),
+                mnstr_input.current_health.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into())),
             ));
-            mnstr_params.push(("max_health", mnstr_input.max_health.map(|i| i.into())));
+            mnstr_params.push(("max_health", mnstr_input.max_health.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
             mnstr_params.push((
                 "current_attack",
-                mnstr_input.current_attack.map(|i| i.into()),
+                mnstr_input.current_attack.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into())),
             ));
-            mnstr_params.push(("max_attack", mnstr_input.max_attack.map(|i| i.into())));
+            mnstr_params.push(("max_attack", mnstr_input.max_attack.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
             mnstr_params.push((
                 "current_defense",
-                mnstr_input.current_defense.map(|i| i.into()),
+                mnstr_input.current_defense.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into())),
             ));
-            mnstr_params.push(("max_defense", mnstr_input.max_defense.map(|i| i.into())));
-            mnstr_params.push(("current_speed", mnstr_input.current_speed.map(|i| i.into())));
-            mnstr_params.push(("max_speed", mnstr_input.max_speed.map(|i| i.into())));
+            mnstr_params.push(("max_defense", mnstr_input.max_defense.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
+            mnstr_params.push(("current_speed", mnstr_input.current_speed.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
+            mnstr_params.push(("max_speed", mnstr_input.max_speed.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
             mnstr_params.push((
                 "current_intelligence",
-                mnstr_input.current_intelligence.map(|i| i.into()),
+                mnstr_input.current_intelligence.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into())),
             ));
             mnstr_params.push((
                 "max_intelligence",
-                mnstr_input.max_intelligence.map(|i| i.into()),
+                mnstr_input.max_intelligence.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into())),
             ));
-            mnstr_params.push(("current_magic", mnstr_input.current_magic.map(|i| i.into())));
-            mnstr_params.push(("max_magic", mnstr_input.max_magic.map(|i| i.into())));
+            mnstr_params.push(("current_magic", mnstr_input.current_magic.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
+            mnstr_params.push(("max_magic", mnstr_input.max_magic.map_or(Some(DEFAULT_STAT_VALUE.into()), |i| Some(i.into()))));
             mnstr_params
         })
         .collect::<Vec<Vec<(&str, Option<DatabaseValue>)>>>();
 
-    let mnstrs = match Mnstr::update_batch(user_id, mnstrs).await {
+    let mnstrs = match Mnstr::update_batch(user.id.clone(), mnstrs).await {
         Ok(mnstrs) => mnstrs,
         Err(e) => {
             println!("[update_batch] Failed to update mnstrs: {:?}", e);

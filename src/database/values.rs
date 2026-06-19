@@ -224,10 +224,7 @@ impl From<f64> for DatabaseValue {
 
 impl<T: Into<DatabaseValue>> From<Option<T>> for DatabaseValue {
     fn from(option: Option<T>) -> Self {
-        if option.is_none() {
-            return DatabaseValue::None;
-        }
-        option.unwrap().into()
+        option.map(|v| v.into()).unwrap_or(DatabaseValue::None)
     }
 }
 

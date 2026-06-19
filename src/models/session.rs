@@ -235,7 +235,7 @@ impl DatabaseResource for Session {
     }
 }
 
-impl crate::utils::sessions::Session for Session {
+impl crate::utils::sessions::SessionTrait<Session> for Session {
     fn expired(&self) -> bool {
         self.expires_at.is_some() && self.expires_at.unwrap() < OffsetDateTime::now_utc()
     }
@@ -245,5 +245,20 @@ impl crate::utils::sessions::Session for Session {
             return Some(error);
         }
         None
+    }
+
+    async fn find_one_by_token(token: String) -> Result<Self, anyhow::Error> {
+        let params = vec![("session_token", token.clone().into())];
+        match find_one_resource_where_fields!(Session, params).await {
+            Ok(session) => Ok(session),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    async fn get_user(&mut self) -> Result<User, anyhow::Error> {
+        match User::find_one(self.user_id.clone(), false).await {
+            Ok(user) => Ok(user),
+            Err(e) => Err(e.into()),
+        }
     }
 }

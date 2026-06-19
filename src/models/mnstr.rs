@@ -64,21 +64,21 @@ pub struct Mnstr {
     pub experience_to_next_level: i32,
 }
 
-const DEFAULT_STAT_VALUE: i32 = 10;
+pub const DEFAULT_STAT_VALUE: i32 = 10;
 
 impl Mnstr {
     pub fn new(
         user_id: String,
-        mnstr_name: String,
-        mnstr_description: String,
+        mnstr_name: Option<String>,
+        mnstr_description: Option<String>,
         mnstr_qr_code: String,
     ) -> Self {
         Self {
             id: "".to_string(),
             user_id,
-            mnstr_name,
-            mnstr_description,
-            mnstr_qr_code,
+            mnstr_name: mnstr_name.unwrap_or(String::new()),
+            mnstr_description: mnstr_description.unwrap_or(String::new()),
+            mnstr_qr_code: mnstr_qr_code,
             created_at: None,
             updated_at: None,
             archived_at: None,
@@ -496,17 +496,6 @@ impl Mnstr {
                 return Err(e.into());
             }
         };
-        if mnstr.max_health == 0 {
-            if let Some(error) = mnstr.update_with_defaults().await {
-                println!(
-                    "[Mnstr::find_one_by] Failed to update with defaults: {:?}",
-                    error
-                );
-                return Err(error.into());
-            }
-        }
-
-        mnstr.update_experience_to_next_level();
 
         if get_relationships {
             if let Some(error) = mnstr.get_relationships().await {
