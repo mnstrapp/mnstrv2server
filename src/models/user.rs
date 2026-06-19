@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use juniper::GraphQLObject;
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, postgres::PgRow};
@@ -9,6 +8,7 @@ use crate::{
     delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
     insert_resource,
     models::{generated::level_xp::XP_FOR_LEVEL, mnstr::Mnstr, session::Session, wallet::Wallet},
+    proto::User as GrpcUser,
     update_resource,
     utils::{
         passwords::hash_password,
@@ -82,6 +82,21 @@ impl User {
             archived_at: None,
             wallet: None,
             mnstrs: Vec::new(),
+        }
+    }
+
+    pub fn to_grpc(&self) -> GrpcUser {
+        GrpcUser {
+            id: self.id.clone(),
+            display_name: self.display_name.clone(),
+            email: self.email.clone().unwrap_or_default(),
+            phone: self.phone.clone(),
+            experience_level: self.experience_level,
+            experience_points: self.experience_points,
+            experience_to_next_level: self.experience_to_next_level,
+            coins: self.coins,
+            wallet: self.wallet.clone().map(|w| w.to_grpc()),
+            mnstrs: self.mnstrs.iter().map(|m| m.to_grpc()).collect(),
         }
     }
 

@@ -11,6 +11,7 @@ use crate::{
     graphql::mnstrs::queries::{MnstrOrderByInput, MnstrOrderDirectionInput},
     insert_resource, insert_resource_batch,
     models::{generated::mnstr_xp::XP_FOR_LEVEL, user::User},
+    proto::Mnstr as GrpcMnstr,
     update_resource, update_resource_batch, upsert_resource, upsert_resource_batch,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
@@ -98,6 +99,32 @@ impl Mnstr {
             experience_to_next_level: 0,
         }
     }
+
+    pub fn to_grpc(&self) -> GrpcMnstr {
+        GrpcMnstr {
+            id: self.id.clone(),
+            user_id: self.user_id.clone(),
+            mnstr_name: self.mnstr_name.clone(),
+            mnstr_description: self.mnstr_description.clone(),
+            mnstr_qr_code: self.mnstr_qr_code.clone(),
+            current_level: self.current_level,
+            current_experience: self.current_experience,
+            current_health: self.current_health,
+            max_health: self.max_health,
+            current_attack: self.current_attack,
+            max_attack: self.max_attack,
+            current_defense: self.current_defense,
+            max_defense: self.max_defense,
+            current_speed: self.current_speed,
+            max_speed: self.max_speed,
+            current_intelligence: self.current_intelligence,
+            max_intelligence: self.max_intelligence,
+            current_magic: self.current_magic,
+            max_magic: self.max_magic,
+            experience_to_next_level: self.experience_to_next_level,
+        }
+    }
+
     pub fn copy_with(
         &self,
         mnstr_name: Option<String>,

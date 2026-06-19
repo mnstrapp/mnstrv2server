@@ -1,9 +1,16 @@
-use rand::Rng;
+use rand::prelude::*;
 use sha2::{Digest, Sha512};
+use std::fmt::Write;
 
 #[allow(dead_code)]
 pub fn hash_password(password: &str) -> String {
-    format!("{:x}", Sha512::digest(password.as_bytes()))
+    let password_bytes = password.as_bytes();
+    Sha512::digest(password_bytes)
+        .iter()
+        .fold(String::with_capacity(128), |mut hash, byte| {
+            write!(&mut hash, "{byte:02x}").expect("writing to a String cannot fail");
+            hash
+        })
 }
 
 #[allow(dead_code)]
@@ -12,6 +19,7 @@ pub fn verify_password(password: &str, hashed_password: &str) -> bool {
 }
 
 pub fn generate_verification_code() -> String {
-    let code = rand::rng().random_range(10000..99999);
+    let mut rng = rand::rng();
+    let code = rng.random_range(10000..99999);
     code.to_string()
 }

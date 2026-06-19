@@ -3,21 +3,32 @@ extern crate rocket;
 
 use rocket_cors::CorsOptions;
 use sqlx::postgres::PgPoolOptions;
-use std::env;
+use std::{env, net::SocketAddr};
+use tonic::transport::Server as GrpcServer;
+use tonic_reflection::server::Builder as GrpcReflectionBuilder;
+
+use crate::proto::session_service_server::SessionServiceServer;
+
+pub mod proto {
+    tonic::include_proto!("mnstrv2");
+}
 
 mod database;
 mod graphql;
 mod models;
+mod services;
 mod utils;
 mod websocket;
 mod battle;
+
+const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("descriptor");
 
 #[get("/")]
 fn index() -> &'static str {
     "Hello, world!"
 }
 
-#[rocket::main]
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let _ = env::var("TWILIO_ACCOUNT_SSID")?;
     let _ = env::var("TWILIO_AUTH_TOKEN")?;
@@ -27,6 +38,21 @@ async fn main() -> anyhow::Result<()> {
     let database_url = env::var("DATABASE_URL")?;
     let pool = PgPoolOptions::new().connect(&*database_url).await?;
     let cors = CorsOptions::default().to_cors().unwrap();
+
+    let session_service =
+        SessionServiceServer::new(services::sessions::SessionServiceImpl::default());
+    let reflection_service = GrpcReflectionBuilder::configure()
+        .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
+        .build_v1()
+        .expect("reflection service could not build");
+
+    let _ = tokio::spawn(async move {
+        GrpcServer::builder()
+            .add_service(session_service)
+            .add_service(reflection_service)
+            .serve(SocketAddr::from(([0, 0, 0, 0], 50051)))
+            .await
+    });
 
     rocket::build()
         .mount("/", routes![index])

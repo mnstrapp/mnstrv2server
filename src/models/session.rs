@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use juniper::GraphQLObject;
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, postgres::PgRow};
@@ -10,6 +9,7 @@ use crate::{
     delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
     insert_resource,
     models::user::User,
+    proto::Session as GrpcSession,
     update_resource,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
@@ -59,6 +59,15 @@ impl Session {
             archived_at: None,
             expires_at: None,
             user: None,
+        }
+    }
+
+    pub fn to_grpc(&self) -> GrpcSession {
+        GrpcSession {
+            id: self.id.clone(),
+            token: self.session_token.clone(),
+            expires_at: self.expires_at.clone().unwrap().to_string().into(),
+            user: self.user.clone().map(|u| u.to_grpc()),
         }
     }
 

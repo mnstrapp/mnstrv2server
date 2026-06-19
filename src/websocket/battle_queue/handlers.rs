@@ -1,5 +1,5 @@
 use futures_util::StreamExt as _;
-use rand::Rng;
+use rand::prelude::*;
 use redis::AsyncTypedCommands;
 use rocket_ws::{Config, Stream, WebSocket, result::Error};
 
@@ -517,7 +517,10 @@ async fn handle_incoming_ws_message(
                             queue.data.opponent_id = Some(battle.opponent_id.clone());
                         }
 
-                        let coin_flip = rand::rng().random_range(0..2);
+                        let coin_flip = {
+                            let mut rng = rand::rng();
+                            rng.random_range(0..2)
+                        };
                         let turn_user_id;
                         if coin_flip == 0 {
                             turn_user_id = battle.challenger_id.clone();
@@ -898,7 +901,10 @@ async fn handle_accept_challenge(
         }
     };
 
-    let coin_flip = rand::rng().random_range(0..2);
+    let coin_flip = {
+        let mut rng = rand::rng();
+        rng.random_range(0..2)
+    };
     let turn_user_id;
     if coin_flip == 0 {
         turn_user_id = challenger_id.clone();

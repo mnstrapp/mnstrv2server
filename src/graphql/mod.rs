@@ -70,7 +70,7 @@ impl Subscription {
     }
 }
 
-pub type Schema = RootNode<'static, Query, Mutation, Subscription>;
+pub type Schema = RootNode<Query, Mutation, Subscription>;
 
 #[get("/graphiql")]
 pub fn graphiql() -> RawHtml<String> {

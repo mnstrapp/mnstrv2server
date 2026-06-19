@@ -130,7 +130,7 @@ macro_rules! update_resource {
             query.push_str(&format!(" WHERE id = ${}", fields.len() + 1));
             query.push_str(&format!(" RETURNING *"));
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for (_, value) in values.iter().enumerate() {
                 match value {
                     DatabaseValue::None => query = query.bind(Option::<String>::None),
@@ -322,7 +322,7 @@ macro_rules! update_resource_batch {
             query.push_str(&format!(") as v({})", fields.join(", ")));
             query.push_str(&format!(" WHERE t.id = v.id RETURNING *"));
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
             }

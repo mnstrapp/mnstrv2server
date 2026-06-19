@@ -8,6 +8,7 @@ use crate::{
     delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
     insert_resource,
     models::transaction::{Transaction, TransactionStatus, TransactionType},
+    proto::Wallet as GrpcWallet,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
 
@@ -49,6 +50,15 @@ impl Wallet {
             archived_at: None,
             coins: 0,
             transactions: Vec::new(),
+        }
+    }
+
+    pub fn to_grpc(&self) -> GrpcWallet {
+        GrpcWallet {
+            id: self.id.clone(),
+            user_id: self.user_id.clone(),
+            coins: self.coins,
+            transactions: self.transactions.iter().map(|t| t.to_grpc()).collect(),
         }
     }
 

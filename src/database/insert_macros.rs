@@ -170,7 +170,7 @@ macro_rules! insert_resource {
             }
             query.push_str(") RETURNING *");
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
             }
@@ -384,7 +384,7 @@ macro_rules! insert_resource_batch {
 
             query.push_str(" RETURNING *");
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
             }

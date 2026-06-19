@@ -1,8 +1,28 @@
 use std::{fs, io::Write};
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>>  {
+    generate_protos()?;
     generate_level_xp();
     generate_mnstr_xp();
+    Ok(())
+}
+
+fn generate_protos() -> Result<(), Box<dyn std::error::Error>> {
+    let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    let descriptor_path = out_dir.join("descriptor.bin");
+    tonic_prost_build::configure()
+        .file_descriptor_set_path(descriptor_path)
+        .build_server(true)
+        .compile_protos(
+            &[
+                "proto/users.proto",
+                "proto/session.proto",
+                "proto/mnstr.proto",
+                "proto/wallets.proto",
+            ],
+            &["proto"],
+        )?;
+    Ok(())
 }
 
 fn generate_level_xp() {

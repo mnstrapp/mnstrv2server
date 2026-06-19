@@ -1,10 +1,8 @@
 use juniper::{GraphQLEnum, GraphQLObject};
 use serde::{Deserialize, Serialize};
 use sqlx::{
-    Encode, Error, Postgres, Row,
-    encode::IsNull,
-    error::BoxDynError,
-    postgres::{PgArgumentBuffer, PgRow, PgValueRef},
+    Error, Postgres, Row,
+    postgres::{PgRow, PgValueRef},
 };
 use time::OffsetDateTime;
 
@@ -12,7 +10,7 @@ use crate::{
     database::{traits::DatabaseResource, values::DatabaseValue},
     delete_resource_where_fields, find_all_resources_where_fields, find_one_resource_where_fields,
     insert_resource,
-    models::wallet::Wallet,
+    proto::Transaction as GrpcTransaction,
     update_resource,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
@@ -38,6 +36,15 @@ impl From<&str> for TransactionType {
             "credit" => TransactionType::Credit,
             "debit" => TransactionType::Debit,
             _ => TransactionType::Credit,
+        }
+    }
+}
+
+impl Into<i32> for TransactionType {
+    fn into(self) -> i32 {
+        match self {
+            TransactionType::Credit => 0,
+            TransactionType::Debit => 1,
         }
     }
 }
@@ -83,6 +90,17 @@ impl From<&str> for TransactionStatus {
             "completed" => TransactionStatus::Completed,
             "failed" => TransactionStatus::Failed,
             _ => TransactionStatus::Preparing,
+        }
+    }
+}
+
+impl Into<i32> for TransactionStatus {
+    fn into(self) -> i32 {
+        match self {
+            TransactionStatus::Preparing => 0,
+            TransactionStatus::Pending => 1,
+            TransactionStatus::Completed => 2,
+            TransactionStatus::Failed => 3,
         }
     }
 }
@@ -136,6 +154,20 @@ impl Transaction {
             error_message: None,
             created_at: None,
             updated_at: None,
+        }
+    }
+
+    pub fn to_grpc(&self) -> GrpcTransaction {
+        GrpcTransaction {
+            id: self.id.clone(),
+            wallet_id: self.wallet_id.clone(),
+            amount: self.transaction_amount,
+            transaction_type: self.transaction_type.clone().into(),
+            transaction_status: self.transaction_status.clone().into(),
+            data: self.transaction_data.clone().unwrap_or_default(),
+            error_message: self.error_message.clone().unwrap_or_default(),
+            created_at: self.created_at.clone().unwrap().to_string().into(),
+            updated_at: self.updated_at.clone().unwrap().to_string().into(),
         }
     }
 

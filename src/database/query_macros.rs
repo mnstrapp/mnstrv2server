@@ -95,7 +95,7 @@ macro_rules! find_all_resources_where_fields {
 
             query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for value in values.iter() {
                 query = query.bind(value);
             }
@@ -194,7 +194,7 @@ macro_rules! find_all_unarchived_resources_where_fields {
                 }
             }
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
             }
@@ -319,7 +319,7 @@ macro_rules! find_all_archived_resources_where_fields {
 
             query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
             }
@@ -413,7 +413,7 @@ macro_rules! find_one_resource_where_fields {
 
             query.push_str(" LIMIT 1");
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
             }
@@ -479,7 +479,7 @@ macro_rules! find_one_unarchived_resource_where_fields {
 
             query.push_str(" LIMIT 1");
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
             }
@@ -662,7 +662,7 @@ macro_rules! find_all_resources_where_fields_like {
 
             query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for _ in params.iter() {
                 query = query.bind(format!("%{}%", $search_term));
             }
@@ -721,7 +721,7 @@ macro_rules! find_all_resources_where_fields_in {
             }
             query.push_str(")");
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for value in $values.iter() {
                 query = query.bind(value);
             }

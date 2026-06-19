@@ -94,7 +94,7 @@ macro_rules! delete_resource_where_fields {
 
             query.push_str(" RETURNING *");
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
             }
@@ -156,7 +156,7 @@ macro_rules! delete_resource_where_fields {
 
             query.push_str(" RETURNING *");
 
-            let mut query = sqlx::query(&query);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for (_, value) in values.iter().enumerate() {
                 query = query.bind(value);
             }
