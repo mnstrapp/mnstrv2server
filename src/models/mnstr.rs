@@ -1,4 +1,4 @@
-use juniper::GraphQLObject;
+use juniper::{GraphQLEnum, GraphQLObject};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use sqlx::{Error, Row, postgres::PgRow};
@@ -8,13 +8,145 @@ use crate::{
     database::{traits::DatabaseResource, values::DatabaseValue},
     delete_resource_where_fields, find_all_resources_where_fields,
     find_all_resources_where_fields_in, find_one_resource_where_fields,
-    graphql::mnstrs::queries::{MnstrOrderByInput, MnstrOrderDirectionInput},
     insert_resource, insert_resource_batch,
     models::{generated::mnstr_xp::XP_FOR_LEVEL, user::User},
-    proto::Mnstr as GrpcMnstr,
-    update_resource, update_resource_batch, upsert_resource, upsert_resource_batch,
+    proto::{Mnstr as GrpcMnstr, MnstrOrderBy as GrpcMnstrOrderBy },
+    update_resource, update_resource_batch,
     utils::time::{deserialize_offset_date_time, serialize_offset_date_time},
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GraphQLEnum, Serialize, Deserialize)]
+pub enum MnstrOrderBy {
+    CreatedAt,
+    UpdatedAt,
+    Name,
+    Level,
+    Experience,
+    Health,
+    Attack,
+    Defense,
+    Speed,
+    Intelligence,
+    Magic,
+}
+
+impl MnstrOrderBy {
+    pub fn to_string(&self) -> String {
+        match self {
+            MnstrOrderBy::CreatedAt => "created_at".to_string(),
+            MnstrOrderBy::UpdatedAt => "updated_at".to_string(),
+            MnstrOrderBy::Name => "mnstr_name".to_string(),
+            MnstrOrderBy::Level => "current_level".to_string(),
+            MnstrOrderBy::Experience => "current_experience".to_string(),
+            MnstrOrderBy::Health => "max_health".to_string(),
+            MnstrOrderBy::Attack => "max_attack".to_string(),
+            MnstrOrderBy::Defense => "max_defense".to_string(),
+            MnstrOrderBy::Speed => "max_speed".to_string(),
+            MnstrOrderBy::Intelligence => "max_intelligence".to_string(),
+            MnstrOrderBy::Magic => "max_magic".to_string(),
+        }
+    }
+
+    pub fn from_string(value: &str) -> Option<Self> {
+        match value {
+            "created_at" => Some(MnstrOrderBy::CreatedAt),
+            "updated_at" => Some(MnstrOrderBy::UpdatedAt),
+            "mnstr_name" => Some(MnstrOrderBy::Name),
+            "current_level" => Some(MnstrOrderBy::Level),
+            "current_experience" => Some(MnstrOrderBy::Experience),
+            "max_health" => Some(MnstrOrderBy::Health),
+            "max_attack" => Some(MnstrOrderBy::Attack),
+            "max_defense" => Some(MnstrOrderBy::Defense),
+            "max_speed" => Some(MnstrOrderBy::Speed),
+            "max_intelligence" => Some(MnstrOrderBy::Intelligence),
+            "max_magic" => Some(MnstrOrderBy::Magic),
+            _ => Some(MnstrOrderBy::UpdatedAt),
+        }
+    }
+
+    pub fn from_grpc(value: i32) -> Self {
+        match value {
+            1 => MnstrOrderBy::CreatedAt,
+            2 => MnstrOrderBy::UpdatedAt,
+            3 => MnstrOrderBy::Name,
+            4 => MnstrOrderBy::Level,
+            5 => MnstrOrderBy::Experience,
+            6 => MnstrOrderBy::Health,
+            7 => MnstrOrderBy::Attack,
+            8 => MnstrOrderBy::Defense,
+            9 => MnstrOrderBy::Speed,
+            10 => MnstrOrderBy::Intelligence,
+            11 => MnstrOrderBy::Magic,
+            _ => MnstrOrderBy::UpdatedAt,
+        }
+    }
+
+    pub fn to_grpc(&self) -> i32 {
+        match self {
+            MnstrOrderBy::CreatedAt => GrpcMnstrOrderBy::CreatedAt.into(),
+            MnstrOrderBy::UpdatedAt => GrpcMnstrOrderBy::UpdatedAt.into(),
+            MnstrOrderBy::Name => GrpcMnstrOrderBy::Name.into(),
+            MnstrOrderBy::Level => GrpcMnstrOrderBy::Level.into(),
+            MnstrOrderBy::Experience => GrpcMnstrOrderBy::Experience.into(),
+            MnstrOrderBy::Health => GrpcMnstrOrderBy::Health.into(),
+            MnstrOrderBy::Attack => GrpcMnstrOrderBy::Attack.into(),
+            MnstrOrderBy::Defense => GrpcMnstrOrderBy::Defense.into(),
+            MnstrOrderBy::Speed => GrpcMnstrOrderBy::Speed.into(),
+            MnstrOrderBy::Intelligence => GrpcMnstrOrderBy::Intelligence.into(),
+            MnstrOrderBy::Magic => GrpcMnstrOrderBy::Magic.into(),
+        }
+    }
+}
+
+impl Default for MnstrOrderBy {
+    fn default() -> Self {
+        MnstrOrderBy::UpdatedAt
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GraphQLEnum, Serialize, Deserialize)]
+pub enum MnstrOrderDirection {
+    Asc,
+    Desc,
+}
+
+impl MnstrOrderDirection {
+    pub fn to_string(&self) -> String {
+        match self {
+            MnstrOrderDirection::Asc => "asc".to_string(),
+            MnstrOrderDirection::Desc => "desc".to_string(),
+        }
+    }
+
+    pub fn from_string(value: &str) -> Option<Self> {
+        match value {
+            "asc" => Some(MnstrOrderDirection::Asc),
+            "desc" => Some(MnstrOrderDirection::Desc),
+            _ => None,
+        }
+    }
+
+    pub fn from_grpc(value: i32) -> Self {
+        match value {
+            1 => MnstrOrderDirection::Asc,
+            2 => MnstrOrderDirection::Desc,
+            _ => MnstrOrderDirection::Asc,
+        }
+    }
+
+    pub fn to_grpc(&self) -> i32 {
+        match self {
+            MnstrOrderDirection::Asc => 1,
+            MnstrOrderDirection::Desc => 2,
+        }
+    }
+}
+
+impl Default for MnstrOrderDirection {
+    fn default() -> Self {
+        MnstrOrderDirection::Asc
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, GraphQLObject, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -508,8 +640,8 @@ impl Mnstr {
 
     pub async fn find_all(
         get_relationships: bool,
-        order_by: Option<MnstrOrderByInput>,
-        order_direction: Option<MnstrOrderDirectionInput>,
+        order_by: Option<MnstrOrderBy>,
+        order_direction: Option<MnstrOrderDirection>,
     ) -> Result<Vec<Self>, anyhow::Error> {
         let mut mnstrs = match find_all_resources_where_fields!(
             Mnstr,
@@ -551,8 +683,8 @@ impl Mnstr {
     pub async fn find_all_by(
         params: Vec<(&str, DatabaseValue)>,
         get_relationships: bool,
-        order_by: Option<MnstrOrderByInput>,
-        order_direction: Option<MnstrOrderDirectionInput>,
+        order_by: Option<MnstrOrderBy>,
+        order_direction: Option<MnstrOrderDirection>,
     ) -> Result<Vec<Self>, anyhow::Error> {
         let mut mnstrs = match find_all_resources_where_fields!(
             Mnstr,

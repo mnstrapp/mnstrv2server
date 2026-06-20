@@ -1,90 +1,10 @@
-use juniper::{FieldError, GraphQLEnum};
-use serde::{Deserialize, Serialize};
+use juniper::FieldError;
 
-use crate::{graphql::Ctx, models::mnstr::Mnstr};
+use crate::{graphql::Ctx, models::mnstr::{Mnstr, MnstrOrderBy, MnstrOrderDirection}};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GraphQLEnum, Serialize, Deserialize)]
-pub enum MnstrOrderByInput {
-    CreatedAt,
-    UpdatedAt,
-    Name,
-    Level,
-    Experience,
-    Health,
-    Attack,
-    Defense,
-    Speed,
-    Intelligence,
-    Magic,
-}
+pub type MnstrOrderByInput = MnstrOrderBy;
+pub type MnstrOrderDirectionInput = MnstrOrderDirection;
 
-impl MnstrOrderByInput {
-    pub fn to_string(&self) -> String {
-        match self {
-            MnstrOrderByInput::CreatedAt => "created_at".to_string(),
-            MnstrOrderByInput::UpdatedAt => "updated_at".to_string(),
-            MnstrOrderByInput::Name => "mnstr_name".to_string(),
-            MnstrOrderByInput::Level => "current_level".to_string(),
-            MnstrOrderByInput::Experience => "current_experience".to_string(),
-            MnstrOrderByInput::Health => "max_health".to_string(),
-            MnstrOrderByInput::Attack => "max_attack".to_string(),
-            MnstrOrderByInput::Defense => "max_defense".to_string(),
-            MnstrOrderByInput::Speed => "max_speed".to_string(),
-            MnstrOrderByInput::Intelligence => "max_intelligence".to_string(),
-            MnstrOrderByInput::Magic => "max_magic".to_string(),
-        }
-    }
-    pub fn from_string(value: &str) -> Option<Self> {
-        match value {
-            "created_at" => Some(MnstrOrderByInput::CreatedAt),
-            "updated_at" => Some(MnstrOrderByInput::UpdatedAt),
-            "mnstr_name" => Some(MnstrOrderByInput::Name),
-            "current_level" => Some(MnstrOrderByInput::Level),
-            "current_experience" => Some(MnstrOrderByInput::Experience),
-            "max_health" => Some(MnstrOrderByInput::Health),
-            "max_attack" => Some(MnstrOrderByInput::Attack),
-            "max_defense" => Some(MnstrOrderByInput::Defense),
-            "max_speed" => Some(MnstrOrderByInput::Speed),
-            "max_intelligence" => Some(MnstrOrderByInput::Intelligence),
-            "max_magic" => Some(MnstrOrderByInput::Magic),
-            _ => None,
-        }
-    }
-}
-
-impl Default for MnstrOrderByInput {
-    fn default() -> Self {
-        MnstrOrderByInput::CreatedAt
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GraphQLEnum, Serialize, Deserialize)]
-pub enum MnstrOrderDirectionInput {
-    Asc,
-    Desc,
-}
-
-impl MnstrOrderDirectionInput {
-    pub fn to_string(&self) -> String {
-        match self {
-            MnstrOrderDirectionInput::Asc => "asc".to_string(),
-            MnstrOrderDirectionInput::Desc => "desc".to_string(),
-        }
-    }
-    pub fn from_string(value: &str) -> Option<Self> {
-        match value {
-            "asc" => Some(MnstrOrderDirectionInput::Asc),
-            "desc" => Some(MnstrOrderDirectionInput::Desc),
-            _ => None,
-        }
-    }
-}
-
-impl Default for MnstrOrderDirectionInput {
-    fn default() -> Self {
-        MnstrOrderDirectionInput::Asc
-    }
-}
 pub struct MnstrQueryType;
 
 #[juniper::graphql_object]

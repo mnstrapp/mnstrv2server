@@ -10,7 +10,7 @@ use crate::{
         battle_log::{BattleLog, BattleLogAction},
         battle_status::{BattleStatus, BattleStatusState},
         generated::mnstr_xp::XP_FOR_LEVEL,
-        mnstr::Mnstr,
+        mnstr::{Mnstr, MnstrOrderBy, MnstrOrderDirection},
         user::User,
     },
     utils::token::RawToken,
@@ -1059,8 +1059,8 @@ async fn load_mnstrs(user_id: &String) -> Result<Vec<Mnstr>, ()> {
     let mnstrs = Mnstr::find_all_by(
         vec![("user_id", user_id.clone().into())],
         false,
-        Option::<crate::graphql::mnstrs::queries::MnstrOrderByInput>::None,
-        Option::<crate::graphql::mnstrs::queries::MnstrOrderDirectionInput>::None,
+        Option::<MnstrOrderBy>::None,
+        Option::<MnstrOrderDirection>::None,
     )
     .await
     .map_err(|_| ())?;
