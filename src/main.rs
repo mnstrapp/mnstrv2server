@@ -7,7 +7,7 @@ use std::{env, net::SocketAddr};
 use tonic::transport::Server as GrpcServer;
 use tonic_reflection::server::Builder as GrpcReflectionBuilder;
 
-use crate::proto::{mnstr_service_server::MnstrServiceServer, session_service_server::SessionServiceServer};
+use crate::proto::{mnstr_service_server::MnstrServiceServer, session_service_server::SessionServiceServer, user_service_server::UserServiceServer};
 
 pub mod proto {
     tonic::include_proto!("mnstrv2");
@@ -42,6 +42,7 @@ async fn main() -> anyhow::Result<()> {
     let session_service =
         SessionServiceServer::new(services::sessions::SessionServiceImpl::default());
     let mnstr_service = MnstrServiceServer::new(services::mnstrs::MnstrServiceImpl::default());
+    let users_service = UserServiceServer::new(services::users::UserServiceImpl::default());
     let reflection_service = GrpcReflectionBuilder::configure()
         .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
         .build_v1()
@@ -51,6 +52,7 @@ async fn main() -> anyhow::Result<()> {
         GrpcServer::builder()
             .add_service(session_service)
             .add_service(mnstr_service)
+            .add_service(users_service)
             .add_service(reflection_service)
             .serve(SocketAddr::from(([0, 0, 0, 0], 50051)))
             .await
