@@ -122,7 +122,7 @@ impl MnstrOrderDirection {
         match value {
             "asc" => Some(MnstrOrderDirection::Asc),
             "desc" => Some(MnstrOrderDirection::Desc),
-            _ => None,
+            _ => Some(MnstrOrderDirection::Desc),
         }
     }
 
@@ -130,7 +130,7 @@ impl MnstrOrderDirection {
         match value {
             1 => MnstrOrderDirection::Asc,
             2 => MnstrOrderDirection::Desc,
-            _ => MnstrOrderDirection::Asc,
+            _ => MnstrOrderDirection::Desc,
         }
     }
 
@@ -144,7 +144,7 @@ impl MnstrOrderDirection {
 
 impl Default for MnstrOrderDirection {
     fn default() -> Self {
-        MnstrOrderDirection::Asc
+        MnstrOrderDirection::Desc
     }
 }
 

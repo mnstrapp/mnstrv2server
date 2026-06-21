@@ -90,7 +90,7 @@ macro_rules! find_all_resources_where_fields {
 
             let order_direction = match $order_direction {
                 Some(order_direction) => order_direction.to_string(),
-                None => "DESC".to_string(),
+                None => "ASC".to_string(),
             };
 
             query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
@@ -206,7 +206,7 @@ macro_rules! find_all_unarchived_resources_where_fields {
 
             let order_direction = match $order_direction {
                 Some(order_direction) => order_direction.to_string(),
-                None => "DESC".to_string(),
+                None => "ASC".to_string(),
             };
 
             query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
@@ -314,7 +314,7 @@ macro_rules! find_all_archived_resources_where_fields {
 
             let order_direction = match $order_direction {
                 Some(order_direction) => order_direction.to_string(),
-                None => "DESC".to_string(),
+                None => "ASC".to_string(),
             };
 
             query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
@@ -411,6 +411,18 @@ macro_rules! find_one_resource_where_fields {
                 }
             }
 
+            let order_by = match $order_by {
+                Some(order_by) => order_by.to_string(),
+                None => "updated_at".to_string(),
+            };
+
+            let order_direction = match $order_direction {
+                Some(order_direction) => order_direction.to_string(),
+                None => "ASC".to_string(),
+            };
+
+            query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
+
             query.push_str(" LIMIT 1");
 
             let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
@@ -446,6 +458,38 @@ macro_rules! find_one_resource_where_fields {
 #[macro_export]
 macro_rules! find_one_unarchived_resource_where_fields {
     ($resource:ty, $params:expr) => {{
+        find_one_unarchived_resource_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, None, None) => {{
+        find_one_unarchived_resource_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, None, $order_direction:expr) => {{
+        find_one_unarchived_resource_where_fields!(
+            $resource,
+            $params,
+            Option::<String>::None,
+            $order_direction
+        )
+    }};
+    ($resource:ty, $params:expr, $order_by:expr, None) => {{
+        find_one_unarchived_resource_where_fields!(
+            $resource,
+            $params,
+            $order_by,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $params:expr, $order_by:expr, $order_direction:expr) => {{
         use crate::database::{
             connection::get_connection, traits::DatabaseResource, values::DatabaseValue,
         };
@@ -476,6 +520,18 @@ macro_rules! find_one_unarchived_resource_where_fields {
                     query.push_str(" AND ");
                 }
             }
+
+            let order_by = match $order_by {
+                Some(order_by) => order_by.to_string(),
+                None => "updated_at".to_string(),
+            };
+
+            let order_direction = match $order_direction {
+                Some(order_direction) => order_direction.to_string(),
+                None => "ASC".to_string(),
+            };
+
+            query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
 
             query.push_str(" LIMIT 1");
 
@@ -546,6 +602,18 @@ macro_rules! find_one_archived_resource_where_fields {
                     query.push_str(" AND ");
                 }
             }
+
+            let order_by = match $order_by {
+                Some(order_by) => order_by.to_string(),
+                None => "updated_at".to_string(),
+            };
+
+            let order_direction = match $order_direction {
+                Some(order_direction) => order_direction.to_string(),
+                None => "ASC".to_string(),
+            };
+
+            query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
 
             query.push_str(" LIMIT 1");
 
@@ -657,7 +725,7 @@ macro_rules! find_all_resources_where_fields_like {
 
             let order_direction = match $order_direction {
                 Some(order_direction) => order_direction.to_string(),
-                None => "DESC".to_string(),
+                None => "ASC".to_string(),
             };
 
             query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
@@ -699,6 +767,42 @@ macro_rules! find_all_resources_where_fields_like {
 #[macro_export]
 macro_rules! find_all_resources_where_fields_in {
     ($resource:ty, $field:expr, $values:expr) => {{
+        find_all_resources_where_fields_in!(
+            $resource,
+            $field,
+            $values,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $field:expr, $values:expr, None, None) => {{
+        find_all_resources_where_fields_in!(
+            $resource,
+            $field,
+            $values,
+            Option::<String>::None,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $field:expr, $values:expr, None, $order_direction:expr) => {{
+        find_all_resources_where_fields_in!(
+            $resource,
+            $field,
+            $values,
+            Option::<String>::None,
+            $order_direction
+        )
+    }};
+    ($resource:ty, $field:expr, $values:expr, $order_by:expr, None) => {{
+        find_all_resources_where_fields_in!(
+            $resource,
+            $field,
+            $values,
+            $order_by,
+            Option::<String>::None
+        )
+    }};
+    ($resource:ty, $field:expr, $values:expr, $order_by:expr, $order_direction:expr) => {{
         use crate::database::{connection::get_connection, traits::DatabaseResource};
         use crate::utils::strings::camel_to_snake_case;
         use pluralizer::pluralize;
@@ -720,6 +824,18 @@ macro_rules! find_all_resources_where_fields_in {
                 }
             }
             query.push_str(")");
+
+            let order_by = match $order_by {
+                Some(order_by) => order_by.to_string(),
+                None => "updated_at".to_string(),
+            };
+
+            let order_direction = match $order_direction {
+                Some(order_direction) => order_direction.to_string(),
+                None => "ASC".to_string(),
+            };
+
+            query.push_str(&format!(" ORDER BY {} {}", order_by, order_direction));
 
             let mut query = sqlx::query(sqlx::AssertSqlSafe(query));
             for value in $values.iter() {

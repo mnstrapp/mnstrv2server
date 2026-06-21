@@ -466,10 +466,10 @@ impl MnstrService for MnstrServiceImpl {
             }
         };
 
-        let order_by = request.order_by.unwrap_or(GrpcMnstrOrderBy::UpdatedAt.into());
+        let order_by = request.order_by.unwrap_or(GrpcMnstrOrderBy::default().into());
         let order_direction = request
             .order_direction
-            .unwrap_or(GrpcMnstrOrderDirection::Asc.into());
+            .unwrap_or(GrpcMnstrOrderDirection::default().into());
 
         let mnstrs = match Mnstr::find_all_by(
             vec![("user_id", user.id.clone().into())],
