@@ -163,6 +163,10 @@ impl SessionService for SessionServiceImpl {
         };
         let code = generate_verification_code();
         user.email_verification_code = Some(code.clone());
+        println!(
+            "[SessionServiceImpl::forgot_password] Updating user with code {}",
+            code
+        );
         if let Some(error) = user.update().await {
             println!(
                 "[SessionServiceImpl::forgot_password] Failed to update user: {:?}",
@@ -211,7 +215,8 @@ impl SessionService for SessionServiceImpl {
             Ok(user) => user,
             Err(e) => {
                 println!(
-                    "[SessionServiceImpl::reset_password] Failed to get user: {:?}",
+                    "[SessionServiceImpl::reset_password] Failed to get user for code {}: {:?}",
+                    code,
                     e
                 );
                 return Err(Status::not_found("Unable to reset password"));
@@ -258,7 +263,6 @@ impl SessionService for SessionServiceImpl {
         };
 
         user.email_verified = true;
-        user.email_verification_code = None;
         if let Some(error) = user.update().await {
             println!(
                 "[SessionServiceImpl::verify_email] Failed to update user: {:?}",
