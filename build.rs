@@ -9,18 +9,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>>  {
 
 fn generate_protos() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    let proto_dir = std::path::PathBuf::from("proto");
     let descriptor_path = out_dir.join("descriptor.bin");
     tonic_prost_build::configure()
         .file_descriptor_set_path(descriptor_path)
         .build_server(true)
         .compile_protos(
             &[
-                "proto/users.proto",
-                "proto/session.proto",
-                "proto/mnstr.proto",
-                "proto/wallets.proto",
+                proto_dir.join("users.proto").to_str().unwrap(),
+                proto_dir.join("session.proto").to_str().unwrap(),
+                proto_dir.join("mnstr.proto").to_str().unwrap(),
+                proto_dir.join("wallets.proto").to_str().unwrap(),
             ],
-            &["proto"],
+            &[proto_dir.to_str().unwrap()],
         )?;
     Ok(())
 }
