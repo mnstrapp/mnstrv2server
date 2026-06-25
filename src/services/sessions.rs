@@ -1,11 +1,9 @@
 use crate::{
     models::{session::Session, user::User},
     proto::{
-        ForgotPasswordRequest, ForgotPasswordResponse, LoginRequest, LoginResponse, LogoutRequest,
-        LogoutResponse, RegisterRequest, RegisterResponse, ResetPasswordRequest,
-        ResetPasswordResponse, VerifyEmailRequest, VerifyEmailResponse, VerifyPhoneRequest, VerifyPhoneResponse,
-        session_service_server::SessionService,
+        ForgotPasswordRequest, ForgotPasswordResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, RegisterRequest, RegisterResponse, ResetPasswordRequest, ResetPasswordResponse, UnregisterRequest, UnregisterResponse, VerifyEmailRequest, VerifyEmailResponse, VerifyPhoneRequest, VerifyPhoneResponse, session_service_server::SessionService
     },
+    services::helpers::get_user_from_token,
     utils::{
         emails::send_email_verification_code,
         passwords::{generate_verification_code, hash_password},
@@ -310,5 +308,24 @@ impl SessionService for SessionServiceImpl {
             return Err(Status::internal(error.to_string()));
         }
         Ok(Response::new(VerifyPhoneResponse { success: true }))
+    }
+
+    async fn unregister(
+        &self,
+        _request: Request<UnregisterRequest>,
+    ) -> Result<Response<UnregisterResponse>, Status> {
+        let request = _request.into_inner();
+        let mut user = match get_user_from_token(request.token.clone()).await {
+            Ok(user) => user,
+            Err(e) => {
+                println!("[SessionServiceImpl::unregister] Failed to get user: {:?}", e);
+                return Err(Status::not_found("Unable to unregister"));
+            }
+        };
+        if let Some(error) = user.delete_permanent().await {
+            println!("[SessionServiceImpl::unregister] Failed to delete user: {:?}", error);
+            return Err(Status::internal(error.to_string()));
+        }
+        Ok(Response::new(UnregisterResponse { success: true }))
     }
 }
