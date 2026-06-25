@@ -1,3 +1,4 @@
-[submodule "proto"]
-	path = proto
-	url = git@github.com:mnstrapp/mnstrv2proto.git
+[submodule "mnstrapp/mnstrv2proto"]
+	path = mnstrapp/mnstrv2proto
+	url = http://github.com/mnstrapp/mnstrv2proto
+	branch = main
